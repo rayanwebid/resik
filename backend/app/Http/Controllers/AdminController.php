@@ -254,6 +254,17 @@ class AdminController extends Controller
     }
 
     /**
+     * Get single news article
+     */
+    public function newsShow(\App\Models\News $news): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $news
+        ]);
+    }
+
+    /**
      * Store new news article
      */
     public function newsStore(Request $request): JsonResponse
@@ -262,15 +273,20 @@ class AdminController extends Controller
             'title' => 'required|string|max:255',
             'summary' => 'nullable|string',
             'content' => 'required|string',
-            'image' => 'nullable|string',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
+
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $imagePath = '/storage/' . $request->file('image')->store('news', 'public');
+        }
 
         $news = \App\Models\News::create([
             'title' => $request->title,
             'slug' => \Illuminate\Support\Str::slug($request->title) . '-' . time(),
             'summary' => $request->summary,
             'content' => $request->content,
-            'image' => $request->image,
+            'image' => $imagePath,
             'author_id' => $request->user()->id,
             'views' => 0,
         ]);
@@ -291,16 +307,21 @@ class AdminController extends Controller
             'title' => 'required|string|max:255',
             'summary' => 'nullable|string',
             'content' => 'required|string',
-            'image' => 'nullable|string',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
-        $news->update([
+        $dataToUpdate = [
             'title' => $request->title,
             'slug' => \Illuminate\Support\Str::slug($request->title) . '-' . $news->id,
             'summary' => $request->summary,
             'content' => $request->content,
-            'image' => $request->image,
-        ]);
+        ];
+
+        if ($request->hasFile('image')) {
+            $dataToUpdate['image'] = '/storage/' . $request->file('image')->store('news', 'public');
+        }
+
+        $news->update($dataToUpdate);
 
         return response()->json([
             'success' => true,
@@ -355,12 +376,25 @@ class AdminController extends Controller
             'address' => 'nullable|string',
             'phone' => 'nullable|string',
             'email' => 'nullable|email|max:255',
+            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
+            'favicon' => 'nullable|mimes:ico,png,jpeg,jpg,svg,gif|max:1024',
         ]);
 
         $company = \App\Models\Company::firstOrCreate(['id' => 1]);
-        $company->update($request->only([
+        
+        $dataToUpdate = $request->only([
             'name', 'history', 'vision', 'mission', 'address', 'phone', 'email',
-        ]));
+        ]);
+
+        if ($request->hasFile('logo')) {
+            $dataToUpdate['logo'] = '/storage/' . $request->file('logo')->store('company', 'public');
+        }
+        
+        if ($request->hasFile('favicon')) {
+            $dataToUpdate['favicon'] = '/storage/' . $request->file('favicon')->store('company', 'public');
+        }
+
+        $company->update($dataToUpdate);
 
         return response()->json([
             'success' => true,

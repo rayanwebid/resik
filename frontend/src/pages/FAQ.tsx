@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '../services/api';
 import { useCompany } from '../contexts/CompanyContext';
+import SEO from '../components/SEO';
 
 const FAQ: React.FC = () => {
     const { company } = useCompany();
@@ -33,6 +34,7 @@ const FAQ: React.FC = () => {
 
     return (
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+            <SEO title="FAQ & Bantuan" description="Informasi bantuan dan pertanyaan yang sering diajukan." />
             <div className="text-center max-w-2xl mx-auto mb-12">
                 <h1 className="text-3xl font-extrabold text-gray-900 flex items-center justify-center gap-2">
                     <HelpCircle className="h-8 w-8 text-emerald-600" /> FAQ & Bantuan

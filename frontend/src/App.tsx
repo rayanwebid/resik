@@ -13,6 +13,7 @@ import Register from './pages/Register';
 import CustomerDashboard from './pages/CustomerDashboard';
 import OfficerDashboard from './pages/OfficerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminNewsForm from './pages/AdminNewsForm';
 
 // Route Guard for Authenticated Users
 const PrivateRoute: React.FC<{ children: React.ReactNode; allowedRole?: string }> = ({
@@ -82,6 +83,22 @@ function AppRoutes() {
       />
 
       {/* Protected Admin Dashboard */}
+      <Route
+        path="/admin/news/create"
+        element={
+          <PrivateRoute allowedRole="super-admin">
+            <AdminNewsForm />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/admin/news/edit/:id"
+        element={
+          <PrivateRoute allowedRole="super-admin">
+            <AdminNewsForm />
+          </PrivateRoute>
+        }
+      />
       <Route
         path="/admin/*"
         element={

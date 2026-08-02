@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Eye } from 'lucide-react';
 import api from '../services/api';
+import SEO from '../components/SEO';
 
 const Berita: React.FC = () => {
     const [newsList, setNewsList] = useState<any[]>([]);
@@ -46,6 +47,7 @@ const Berita: React.FC = () => {
 
     return (
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+            <SEO title="Berita Aktual" description="Kumpulan berita lingkungan dan aktivitas bank sampah." />
             <div className="mb-12">
                 <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight sm:text-4xl">
                     Berita Lingkungan & Aktivitas

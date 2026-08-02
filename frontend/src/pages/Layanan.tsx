@@ -1,12 +1,14 @@
 import React from 'react';
 import { Truck, CreditCard, Shield, Settings2 } from 'lucide-react';
 import { useCompany } from '../contexts/CompanyContext';
+import SEO from '../components/SEO';
 
 const Layanan: React.FC = () => {
     const { company } = useCompany();
 
     return (
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-16">
+            <SEO title="Layanan Kami" description="Layanan pengelolaan sampah harian untuk pemukiman dan komersial." />
             {/* Header */}
             <div className="text-center max-w-3xl mx-auto space-y-4">
                 <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight sm:text-5xl">

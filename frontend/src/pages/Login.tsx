@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Lock, Mail, AlertTriangle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
+import SEO from '../components/SEO';
 
 const Login: React.FC = () => {
     const { login } = useAuth();
@@ -35,6 +36,7 @@ const Login: React.FC = () => {
 
     return (
         <div className="max-w-md mx-auto my-20 px-4">
+            <SEO title="Masuk" description="Masuk ke dasbor ResikApp." />
             <div className="bg-white p-8 border border-gray-100 rounded-2xl shadow-sm space-y-6">
                 <div className="text-center">
                     <h2 className="text-2xl font-bold text-gray-900">Masuk Akun</h2>

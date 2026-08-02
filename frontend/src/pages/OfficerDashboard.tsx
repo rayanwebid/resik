@@ -9,6 +9,7 @@ import {
 import api from '../services/api';
 import { useCompany } from '../contexts/CompanyContext';
 import type { PickupRequest } from '../types';
+import SEO from '../components/SEO';
 
 const OfficerDashboard: React.FC = () => {
     const { user, logout } = useAuth();
@@ -179,12 +180,17 @@ const OfficerDashboard: React.FC = () => {
 
     return (
         <div className="flex flex-col md:flex-row h-screen bg-slate-50 overflow-hidden">
+            <SEO title="Dasbor Petugas" description="Dasbor petugas ResikApp." />
             {/* Mobile Header */}
             <div className="md:hidden sticky top-0 z-50 bg-slate-900 text-white flex items-center justify-between px-4 py-3.5 shadow-md shrink-0">
                 <div className="flex items-center space-x-2">
-                    <div className="p-1.5 bg-emerald-600 rounded-lg">
-                        <Truck className="h-4.5 w-4.5 text-white" />
-                    </div>
+                    {company.logo ? (
+                        <img src={company.logo.startsWith('http') ? company.logo : `http://localhost:8000${company.logo}`} alt="Logo" className="h-7 w-auto max-w-[3.5rem] object-contain rounded-lg bg-white p-0.5" />
+                    ) : (
+                        <div className="p-1.5 bg-emerald-600 rounded-lg">
+                            <Truck className="h-4 w-4 text-white" />
+                        </div>
+                    )}
                     <span className="font-bold text-base tracking-wide">{company.name}</span>
                 </div>
                 <div className="flex items-center space-x-3">
@@ -203,9 +209,13 @@ const OfficerDashboard: React.FC = () => {
             <aside className="hidden md:flex w-64 bg-slate-900 text-slate-300 flex-col justify-between shrink-0">
                 <div>
                     <div className="p-6 border-b border-slate-800 flex items-center space-x-2 text-white">
-                        <div className="p-2 bg-emerald-600 rounded-lg">
-                            <Truck className="h-5 w-5" />
-                        </div>
+                        {company.logo ? (
+                            <img src={company.logo.startsWith('http') ? company.logo : `http://localhost:8000${company.logo}`} alt="Logo" className="h-8 w-auto max-w-[4rem] object-contain rounded-lg bg-white p-1" />
+                        ) : (
+                            <div className="p-2 bg-emerald-600 rounded-lg">
+                                <Truck className="h-5 w-5" />
+                            </div>
+                        )}
                         <span className="font-bold text-lg">{company.name}</span>
                     </div>
 

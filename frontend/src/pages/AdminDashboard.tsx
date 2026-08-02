@@ -14,6 +14,7 @@ import type { User, Officer, PickupRequest, Payment } from '../types';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import SEO from '../components/SEO';
 
 // Fix leaflet default icon missing issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -64,6 +65,8 @@ const AdminDashboard: React.FC = () => {
     const [settingsLoading, setSettingsLoading] = useState(false);
     const [settingsSuccess, setSettingsSuccess] = useState(false);
     const [settingsError, setSettingsError] = useState<string | null>(null);
+    const [settingsLogo, setSettingsLogo] = useState<File | null>(null);
+    const [settingsFavicon, setSettingsFavicon] = useState<File | null>(null);
 
     // Selected items for Details/Preview Modal
     const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
@@ -201,7 +204,16 @@ const AdminDashboard: React.FC = () => {
         setSettingsSuccess(false);
         setSettingsError(null);
         try {
-            const res = await api.post('/admin/settings', settings);
+            const formData = new FormData();
+            Object.keys(settings).forEach(key => {
+                formData.append(key, (settings as any)[key] || '');
+            });
+            if (settingsLogo) formData.append('logo', settingsLogo);
+            if (settingsFavicon) formData.append('favicon', settingsFavicon);
+
+            const res = await api.post('/admin/settings', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
             if (res.data.success) {
                 setSettingsSuccess(true);
                 setTimeout(() => setSettingsSuccess(false), 4000);
@@ -357,16 +369,7 @@ const AdminDashboard: React.FC = () => {
         return `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide ${map[status] ?? 'bg-slate-100 text-slate-700'}`;
     };
 
-    if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-400 mx-auto mb-4"></div>
-                    <p className="text-slate-400 text-sm font-medium">Memuat panel administrasi...</p>
-                </div>
-            </div>
-        );
-    }
+    // Tampilan loading layar penuh dihapus agar panel administrasi memuat lebih instan
 
     const navItems = [
         { id: 'overview', label: 'Ringkasan', icon: LayoutDashboard, badge: null },
@@ -379,14 +382,19 @@ const AdminDashboard: React.FC = () => {
 
     return (
         <div className="flex h-screen overflow-hidden bg-slate-50">
+            <SEO title="Dasbor Admin" description="Dasbor admin ResikApp." />
             {/* ─── SIDEBAR ─────────────────────────────── */}
             <aside className="hidden md:flex w-64 bg-gradient-to-b from-slate-900 to-slate-800 flex flex-col shrink-0 shadow-2xl">
                 {/* Logo */}
                 <div className="px-6 py-5 border-b border-slate-700/60">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-emerald-500 rounded-xl shadow-lg shadow-emerald-500/30">
-                            <Shield className="h-5 w-5 text-white" />
-                        </div>
+                        {company.logo ? (
+                            <img src={company.logo.startsWith('http') ? company.logo : `http://localhost:8000${company.logo}`} alt="Logo" className="h-10 w-auto max-w-[4rem] object-contain rounded-xl bg-white p-1 shadow-sm" />
+                        ) : (
+                            <div className="p-2 bg-emerald-500 rounded-xl shadow-lg shadow-emerald-500/30">
+                                <Shield className="h-5 w-5 text-white" />
+                            </div>
+                        )}
                         <div>
                             <p className="text-white font-bold text-sm tracking-wide">{company.name}</p>
                             <p className="text-emerald-400 text-xs font-medium">Admin Panel</p>
@@ -1275,11 +1283,7 @@ const AdminDashboard: React.FC = () => {
                                     <div className="flex justify-between items-center text-xs">
                                         <h3 className="font-bold text-slate-700 text-sm">Semua Daftar Berita</h3>
                                         <button
-                                            onClick={() => {
-                                                setEditNewsItem(null);
-                                                setNewsForm({ title: '', summary: '', content: '', image: '' });
-                                                setIsNewsModalOpen(true);
-                                            }}
+                                            onClick={() => navigate('/admin/news/create')}
                                             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
                                         >
                                             <Plus className="h-4 w-4" /> Tambah Berita Baru
@@ -1323,16 +1327,7 @@ const AdminDashboard: React.FC = () => {
                                                             <td className="px-6 py-4 font-medium text-slate-500">{new Date(item.created_at).toLocaleDateString('id-ID', { dateStyle: 'medium' })}</td>
                                                             <td className="px-6 py-4 space-x-1.5 whitespace-nowrap">
                                                                 <button
-                                                                    onClick={() => {
-                                                                        setEditNewsItem(item);
-                                                                        setNewsForm({
-                                                                            title: item.title,
-                                                                            summary: item.summary || '',
-                                                                            content: item.content,
-                                                                            image: item.image || ''
-                                                                        });
-                                                                        setIsNewsModalOpen(true);
-                                                                    }}
+                                                                    onClick={() => navigate('/admin/news/edit/' + item.id)}
                                                                     className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded transition-colors cursor-pointer"
                                                                     title="Edit Artikel"
                                                                 >
@@ -1375,6 +1370,28 @@ const AdminDashboard: React.FC = () => {
                                         </div>
                                     )}
                                     <form onSubmit={handleSaveSettings} className="space-y-4 text-xs font-semibold">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-gray-100 pb-4 mb-2">
+                                            <div>
+                                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1.5">Logo Aplikasi</label>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={e => setSettingsLogo(e.target.files?.[0] || null)}
+                                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs bg-white"
+                                                />
+                                                <p className="text-[10px] text-gray-400 mt-1">Kosongkan jika tidak ingin mengubah</p>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1.5">Favicon (Ikon Tab)</label>
+                                                <input
+                                                    type="file"
+                                                    accept=".ico,.png"
+                                                    onChange={e => setSettingsFavicon(e.target.files?.[0] || null)}
+                                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs bg-white"
+                                                />
+                                                <p className="text-[10px] text-gray-400 mt-1">Gunakan format .png / .ico</p>
+                                            </div>
+                                        </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             <div>
                                                 <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1.5">Nama Instansi / Website</label>

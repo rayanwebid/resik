@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigation, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import api from '../services/api';
+import SEO from '../components/SEO';
 
 const Register: React.FC = () => {
     const { register: registerAuth } = useAuth();
@@ -132,6 +132,7 @@ const Register: React.FC = () => {
     if (success) {
         return (
             <div className="max-w-md mx-auto my-20 px-4 text-center">
+                <SEO title="Registrasi Berhasil" description="Registrasi akun ResikApp berhasil." />
                 <div className="bg-white p-8 border border-gray-100 rounded-2xl shadow-sm space-y-6">
                     <div className="flex justify-center text-emerald-600">
                         <CheckCircle2 className="h-16 w-16 animate-bounce" />
@@ -153,6 +154,7 @@ const Register: React.FC = () => {
 
     return (
         <div className="max-w-2xl mx-auto my-12 px-4">
+            <SEO title="Daftar" description="Daftar akun ResikApp baru." />
             <div className="bg-white p-8 border border-gray-100 rounded-2xl shadow-sm space-y-6">
                 <div className="text-center">
                     <h2 className="text-2xl font-bold text-gray-900">Daftar Akun Baru</h2>

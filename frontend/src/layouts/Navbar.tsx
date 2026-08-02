@@ -33,9 +33,13 @@ const Navbar: React.FC = () => {
                     <div className="flex justify-between h-16">
                         <div className="flex items-center">
                             <Link to="/" className="flex items-center space-x-2">
-                                <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600">
-                                    <Trash2 className="h-6 w-6" />
-                                </div>
+                                {company.logo ? (
+                                    <img src={company.logo.startsWith('http') ? company.logo : `http://localhost:8000${company.logo}`} alt="Logo" className="h-8 max-w-[4rem] w-auto object-contain" />
+                                ) : (
+                                    <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600">
+                                        <Trash2 className="h-6 w-6" />
+                                    </div>
+                                )}
                                 <span className="font-bold text-xl text-gray-900 tracking-tight">{company.name}</span>
                             </Link>
                         </div>

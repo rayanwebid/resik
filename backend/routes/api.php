@@ -72,8 +72,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // News & Settings Management
         Route::get('/news', [AdminController::class, 'newsIndex']);
+        Route::get('/news/{news}', [AdminController::class, 'newsShow']);
         Route::post('/news', [AdminController::class, 'newsStore']);
-        Route::put('/news/{news}', [AdminController::class, 'newsUpdate']);
+        Route::post('/news/{news}', [AdminController::class, 'newsUpdate']); // Changed to POST for multipart/form-data
         Route::delete('/news/{news}', [AdminController::class, 'newsDestroy']);
         Route::get('/settings', [AdminController::class, 'getSettings']);
         Route::post('/settings', [AdminController::class, 'updateSettings']);

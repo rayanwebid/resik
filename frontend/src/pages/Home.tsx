@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 import { useCompany } from '../contexts/CompanyContext';
+import SEO from '../components/SEO';
 
 const Home: React.FC = () => {
     const { company } = useCompany();
@@ -59,6 +60,7 @@ const Home: React.FC = () => {
 
     return (
         <div className="space-y-24 pb-24 bg-slate-50/50">
+            <SEO title="Beranda" />
             {/* Hero Section */}
             <section className="relative overflow-hidden bg-gradient-to-tr from-emerald-600 via-teal-600 to-cyan-700 text-white min-h-[85vh] flex items-center pt-24 pb-16">
                 {/* Abstract Glowing Background Orbs */}

@@ -10,6 +10,7 @@ interface CompanyData {
     phone: string;
     email: string;
     logo?: string;
+    favicon?: string;
 }
 
 interface CompanyContextType {
@@ -39,7 +40,19 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         try {
             const res = await api.get('/company-profile');
             if (res.data.success && res.data.data) {
-                setCompany(res.data.data);
+                const companyData = res.data.data;
+                setCompany(companyData);
+
+                if (companyData.favicon) {
+                    let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+                    if (!link) {
+                        link = document.createElement('link');
+                        link.rel = 'icon';
+                        document.head.appendChild(link);
+                    }
+                    const baseUrl = `http://${window.location.hostname}:8000`;
+                    link.href = companyData.favicon.startsWith('http') ? companyData.favicon : `${baseUrl}${companyData.favicon}`;
+                }
             }
         } catch (err) {
             console.error('Failed to fetch company profile:', err);

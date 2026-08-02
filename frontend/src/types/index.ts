@@ -73,6 +73,8 @@ export interface Officer {
     region?: string;
     schedule?: string[];
     is_active: boolean;
+    latitude?: number;
+    longitude?: number;
 }
 
 export interface PickupRequest {

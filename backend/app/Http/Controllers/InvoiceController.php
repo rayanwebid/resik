@@ -84,6 +84,13 @@ class InvoiceController extends Controller
 
         $badgeClass = $payment->status === 'Paid' ? 'badge-paid' : 'badge-unpaid';
 
+        $companyName = ($company['name'] ?? '') ?: 'SI-SAMPAH';
+        $companyPhone = $company['phone'] ?? '';
+        $companyEmail = $company['email'] ?? '';
+        $companyAddress = $company['address'] ?? '';
+        $customerName = optional($payment->customer->user)->name ?? optional($payment->customer)->name ?? '-';
+        $customerEmail = optional($payment->customer->user)->email ?? '-';
+
         return <<<HTML
 <!DOCTYPE html>
 <html lang="id">
@@ -120,8 +127,8 @@ class InvoiceController extends Controller
 <div class="page">
     <div class="header">
         <div class="logo">
-            {$company['name'] ?? 'SI-SAMPAH'}
-            <span>{$company['phone'] ?? ''} | {$company['email'] ?? ''}<br>{$company['address'] ?? ''}</span>
+            {$companyName}
+            <span>{$companyPhone} | {$companyEmail}<br>{$companyAddress}</span>
         </div>
         <div>
             <div class="invoice-title">INVOICE</div>
@@ -132,8 +139,8 @@ class InvoiceController extends Controller
     <div class="grid2">
         <div>
             <p class="label">Ditagihkan Kepada</p>
-            <p>{$payment->customer->user->name ?? $payment->customer->name ?? '-'}</p>
-            <p>{$payment->customer->user->email ?? '-'}</p>
+            <p>{$customerName}</p>
+            <p>{$customerEmail}</p>
         </div>
         <div style="text-align:right;">
             <p class="label">Jatuh Tempo</p>

@@ -59,7 +59,6 @@ const CustomerDashboard: React.FC = () => {
     const [proofPreviewUrl, setProofPreviewUrl] = useState<string | null>(null);
     const [payLoading, setPayLoading] = useState(false);
     const [paySuccess, setPaySuccess] = useState(false);
-    const [showProofUpload, setShowProofUpload] = useState<boolean>(true);
 
     // Selected Items for Details Modal
     const [selectedPickup, setSelectedPickup] = useState<any | null>(null);

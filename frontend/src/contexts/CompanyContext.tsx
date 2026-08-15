@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import api from '../services/api';
+import api, { getApiBaseUrl } from '../services/api';
 
 interface CompanyData {
     name: string;
@@ -44,14 +44,23 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 setCompany(companyData);
 
                 if (companyData.favicon) {
-                    let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
-                    if (!link) {
-                        link = document.createElement('link');
-                        link.rel = 'icon';
-                        document.head.appendChild(link);
-                    }
-                    const baseUrl = `http://${window.location.hostname}:8000`;
-                    link.href = companyData.favicon.startsWith('http') ? companyData.favicon : `${baseUrl}${companyData.favicon}`;
+                    const baseUrl = getApiBaseUrl();
+                    const iconUrl = companyData.favicon.startsWith('http')
+                        ? companyData.favicon
+                        : `${baseUrl}${companyData.favicon}`;
+                    const fullHref = `${iconUrl}?v=${Date.now()}`;
+
+                    document.querySelectorAll("link[rel*='icon']").forEach(el => el.remove());
+
+                    const newLink = document.createElement('link');
+                    newLink.rel = 'icon';
+                    newLink.href = fullHref;
+                    document.head.appendChild(newLink);
+
+                    const shortcutLink = document.createElement('link');
+                    shortcutLink.rel = 'shortcut icon';
+                    shortcutLink.href = fullHref;
+                    document.head.appendChild(shortcutLink);
                 }
             }
         } catch (err) {

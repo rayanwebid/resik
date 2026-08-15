@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StorePickupRequest;
 use App\Services\PickupService;
+use App\Services\PaymentService;
 use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -11,10 +12,12 @@ use Illuminate\Http\JsonResponse;
 class CustomerController extends Controller
 {
     protected $pickupService;
+    protected $paymentService;
 
-    public function __construct(PickupService $pickupService)
+    public function __construct(PickupService $pickupService, PaymentService $paymentService)
     {
         $this->pickupService = $pickupService;
+        $this->paymentService = $paymentService;
     }
 
     /**
@@ -90,7 +93,7 @@ class CustomerController extends Controller
     }
 
     /**
-     * Get customer payments history
+     * Get customer payments history and active payment methods
      */
     public function payments(Request $request): JsonResponse
     {
@@ -99,11 +102,13 @@ class CustomerController extends Controller
             return response()->json(['success' => false, 'message' => 'Profil pelanggan tidak ditemukan.'], 404);
         }
 
-        $payments = Payment::where('customer_id', $customer->id)->latest()->get();
+        $payments = $this->paymentService->getCustomerPayments($customer->id);
+        $paymentMethods = $this->paymentService->getActivePaymentMethods();
 
         return response()->json([
             'success' => true,
-            'data' => $payments
+            'data' => $payments,
+            'payment_methods' => $paymentMethods,
         ]);
     }
 
@@ -112,14 +117,16 @@ class CustomerController extends Controller
      */
     public function pay(Request $request, Payment $payment): JsonResponse
     {
+        $paymentMethodNames = $this->paymentService->getActivePaymentMethods()->pluck('type')->toArray();
+
         $request->validate([
-            'payment_method' => 'required|string',
-            'proof_path' => 'required|string',
+            'payment_method' => 'required|string|in:' . implode(',', $paymentMethodNames),
+            'proof_path' => 'nullable|string',
         ]);
 
         $payment->update([
             'payment_method' => $request->payment_method,
-            'proof_path' => $request->proof_path,
+            'proof_path' => $request->payment_method === 'cash' ? null : $request->proof_path,
             'status' => 'Pending',
             'payment_date' => now()
         ]);

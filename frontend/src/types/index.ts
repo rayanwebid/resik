@@ -110,6 +110,7 @@ export interface PickupHistory {
 export interface Payment {
     id: number;
     customer_id: number;
+    invoice_number?: string;
     amount: number;
     month: number;
     year: number;
@@ -117,5 +118,33 @@ export interface Payment {
     payment_method?: string;
     proof_path?: string;
     payment_date?: string;
+    due_date?: string;
+    invoice_date?: string;
+    paid_at?: string;
     customer?: Customer;
 }
+
+export interface PaymentMethod {
+    id: number;
+    name: string;
+    type: 'bank_transfer' | 'qris' | 'cash' | 'virtual_account';
+    bank_name?: string;
+    account_number?: string;
+    account_holder?: string;
+    image_path?: string;
+    description?: string;
+    order?: number;
+    is_active: boolean;
+}
+
+export interface WorkRegion {
+    id: number;
+    name: string;
+    code: string;
+    description?: string;
+    is_active: boolean;
+    officers_count?: number;
+    created_at?: string;
+    updated_at?: string;
+}
+

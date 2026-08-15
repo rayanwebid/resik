@@ -116,30 +116,61 @@ const Home: React.FC = () => {
                                 </h3>
 
                                 <div className="space-y-4">
-                                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-amber-400/20 text-amber-300 rounded-lg">
-                                                <Truck className="h-5 w-5" />
+                                    {data.active_pickup ? (
+                                        <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2.5 bg-amber-400/20 text-amber-300 rounded-xl">
+                                                    <Truck className="h-5 w-5 animate-bounce" />
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-xs text-emerald-200 font-medium">{data.active_pickup.status_label || 'Sedang Dijemput'}</p>
+                                                        <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                                                    </div>
+                                                    <p className="text-sm font-semibold text-white">{data.active_pickup.location}</p>
+                                                    {data.active_pickup.waste_type && (
+                                                        <p className="text-[11px] text-emerald-100/80 mt-0.5 font-normal">
+                                                            {data.active_pickup.waste_type} • Est. {data.active_pickup.estimated_weight} Kg
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="text-xs text-emerald-200">Sedang Dijemput</p>
-                                                <p className="text-sm font-semibold">Kecamatan Kebayoran Baru</p>
-                                            </div>
+                                            <span className="text-xs px-2.5 py-1 bg-amber-400/30 text-amber-200 rounded-full font-bold border border-amber-400/30 uppercase tracking-wider">
+                                                Aktif
+                                            </span>
                                         </div>
-                                        <span className="text-xs px-2.5 py-1 bg-amber-400/30 text-amber-200 rounded-full font-medium">Aktif</span>
-                                    </div>
+                                    ) : (
+                                        <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2.5 bg-slate-400/20 text-slate-300 rounded-xl">
+                                                    <Truck className="h-5 w-5" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-emerald-200 font-medium">Status Penjemputan Armada</p>
+                                                    <p className="text-sm font-semibold text-slate-200">Tidak ada aktivitas penjemputan</p>
+                                                </div>
+                                            </div>
+                                            <span className="text-xs px-2.5 py-1 bg-slate-400/20 text-slate-300 rounded-full font-medium">
+                                                Standby
+                                            </span>
+                                        </div>
+                                    )}
 
-                                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10">
                                         <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-emerald-400/20 text-emerald-300 rounded-lg">
+                                            <div className="p-2.5 bg-emerald-400/20 text-emerald-300 rounded-xl">
                                                 <Leaf className="h-5 w-5" />
                                             </div>
                                             <div>
-                                                <p className="text-xs text-emerald-200">Total Daur Ulang</p>
-                                                <p className="text-sm font-semibold">14,289 Kg Bulan Ini</p>
+                                                <p className="text-xs text-emerald-200 font-medium">Total Daur Ulang</p>
+                                                <p className="text-sm font-semibold text-white">
+                                                    {data.stats?.total_recycled_kg ? `${data.stats.total_recycled_kg.toLocaleString('id-ID')} Kg Terkelola` : '0 Kg Terkelola'}
+                                                </p>
                                             </div>
                                         </div>
-                                        <span className="text-xs px-2.5 py-1 bg-emerald-400/30 text-amber-200 rounded-full font-medium">+12%</span>
+                                        <span className="text-xs px-2.5 py-1 bg-emerald-400/30 text-emerald-200 rounded-full font-medium">
+                                            Realtime
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -159,11 +190,15 @@ const Home: React.FC = () => {
             <section className="-mt-16 relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 bg-white shadow-xl hover:shadow-2xl transition-all duration-300 rounded-3xl p-6 sm:p-8 border border-slate-100">
                     <div className="text-center p-4 border-r border-slate-100 last:border-0">
-                        <p className="text-3xl sm:text-4xl font-extrabold text-emerald-600">8.420+</p>
+                        <p className="text-3xl sm:text-4xl font-extrabold text-emerald-600">
+                            {data.stats?.total_customers ? `${data.stats.total_customers}+` : '0+'}
+                        </p>
                         <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Warga Terdaftar</p>
                     </div>
                     <div className="text-center p-4 border-r border-slate-100 last:border-0">
-                        <p className="text-3xl sm:text-4xl font-extrabold text-teal-600">25.6 Tons</p>
+                        <p className="text-3xl sm:text-4xl font-extrabold text-teal-600">
+                            {data.stats?.total_recycled_kg ? `${data.stats.total_recycled_kg.toLocaleString('id-ID')} Kg` : '0 Kg'}
+                        </p>
                         <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Sampah Terkelola</p>
                     </div>
                     <div className="text-center p-4 border-r border-slate-100 last:border-0">
@@ -171,7 +206,9 @@ const Home: React.FC = () => {
                         <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">SLA Ketepatan Waktu</p>
                     </div>
                     <div className="text-center p-4 last:border-0">
-                        <p className="text-3xl sm:text-4xl font-extrabold text-sky-600">30.7 Tons</p>
+                        <p className="text-3xl sm:text-4xl font-extrabold text-sky-600">
+                            {data.stats?.total_recycled_kg ? `${(data.stats.total_recycled_kg * 0.0012).toFixed(1)} Tons` : '0 Tons'}
+                        </p>
                         <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">Emisi CO2 Ditekan</p>
                     </div>
                 </div>

@@ -1,7 +1,14 @@
 import axios from 'axios';
 
+export const getApiBaseUrl = () => {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return `http://${window.location.hostname}:8000`;
+    }
+    return `${window.location.protocol}//${window.location.host}`;
+};
+
 const api = axios.create({
-    baseURL: `http://${window.location.hostname}:8000/api`,
+    baseURL: `${getApiBaseUrl()}/api`,
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',

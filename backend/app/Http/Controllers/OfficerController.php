@@ -40,7 +40,8 @@ class OfficerController extends Controller
                     'completed_tasks' => $completed,
                     'active_tasks' => $active,
                 ],
-                'next_task' => $tasks->where('status', 'menunggu')->first()
+                'next_task' => $tasks->where('status', 'menunggu')->first(),
+                'officer' => $officer,
             ]
         ]);
     }

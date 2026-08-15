@@ -16,5 +16,6 @@ class Company extends Model
         'phone',
         'email',
         'logo',
+        'favicon',
     ];
 }

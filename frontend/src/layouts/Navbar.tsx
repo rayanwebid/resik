@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useCompany } from '../contexts/CompanyContext';
 import { Trash2, LogOut, LayoutDashboard, Home, Newspaper, HelpCircle, User, Truck } from 'lucide-react';
+import { getApiBaseUrl } from '../services/api';
 
 const Navbar: React.FC = () => {
     const { user, logout, isAuthenticated } = useAuth();
@@ -34,7 +35,7 @@ const Navbar: React.FC = () => {
                         <div className="flex items-center">
                             <Link to="/" className="flex items-center space-x-2">
                                 {company.logo ? (
-                                    <img src={company.logo.startsWith('http') ? company.logo : `http://localhost:8000${company.logo}`} alt="Logo" className="h-8 max-w-[4rem] w-auto object-contain" />
+                                    <img src={company.logo.startsWith('http') ? company.logo : `${getApiBaseUrl()}${company.logo}`} alt="Logo" className="h-8 max-w-[4rem] w-auto object-contain" />
                                 ) : (
                                     <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600">
                                         <Trash2 className="h-6 w-6" />

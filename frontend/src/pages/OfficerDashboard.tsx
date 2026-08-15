@@ -6,7 +6,7 @@ import {
     Clock, MapPin, Upload, CheckSquare, Compass, Eye, X,
     Trash2, Camera, Phone, Check, Activity, Shield
 } from 'lucide-react';
-import api from '../services/api';
+import api, { getApiBaseUrl } from '../services/api';
 import { useCompany } from '../contexts/CompanyContext';
 import type { PickupRequest } from '../types';
 import SEO from '../components/SEO';
@@ -21,12 +21,12 @@ const OfficerDashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     // GPS Simulation states
-    const [gpsData, setGpsData] = useState({ latitude: '-6.175392', longitude: '106.827153' });
+    const [gpsData, setGpsData] = useState({ latitude: '-8.366022', longitude: '114.165939' });
     const [gpsLoading, setGpsLoading] = useState(false);
     const [gpsSuccess, setGpsSuccess] = useState(false);
     const [simulatedLogs, setSimulatedLogs] = useState<Array<{ time: string, lat: string, lng: string }>>([
-        { time: '18:55', lat: '-6.175390', lng: '106.827140' },
-        { time: '18:58', lat: '-6.175392', lng: '106.827153' }
+        { time: '18:55', lat: '-8.366010', lng: '114.165920' },
+        { time: '18:58', lat: '-8.366022', lng: '114.165939' }
     ]);
 
     // Task Completion states
@@ -52,6 +52,13 @@ const OfficerDashboard: React.FC = () => {
                     completed_tasks: s.completed_tasks || 0,
                     active_tasks: s.active_tasks || 0
                 });
+                const off = resDash.data.data.officer;
+                if (off && off.latitude && off.longitude) {
+                    setGpsData({
+                        latitude: String(off.latitude),
+                        longitude: String(off.longitude)
+                    });
+                }
             }
 
             const resTasks = await api.get('/officer/tasks');
@@ -185,7 +192,7 @@ const OfficerDashboard: React.FC = () => {
             <div className="md:hidden sticky top-0 z-50 bg-slate-900 text-white flex items-center justify-between px-4 py-3.5 shadow-md shrink-0">
                 <div className="flex items-center space-x-2">
                     {company.logo ? (
-                        <img src={company.logo.startsWith('http') ? company.logo : `http://localhost:8000${company.logo}`} alt="Logo" className="h-7 w-auto max-w-[3.5rem] object-contain rounded-lg bg-white p-0.5" />
+                        <img src={company.logo.startsWith('http') ? company.logo : `${getApiBaseUrl()}${company.logo}`} alt="Logo" className="h-7 w-auto max-w-[3.5rem] object-contain rounded-lg bg-white p-0.5" />
                     ) : (
                         <div className="p-1.5 bg-emerald-600 rounded-lg">
                             <Truck className="h-4 w-4 text-white" />
@@ -210,7 +217,7 @@ const OfficerDashboard: React.FC = () => {
                 <div>
                     <div className="p-6 border-b border-slate-800 flex items-center space-x-2 text-white">
                         {company.logo ? (
-                            <img src={company.logo.startsWith('http') ? company.logo : `http://localhost:8000${company.logo}`} alt="Logo" className="h-8 w-auto max-w-[4rem] object-contain rounded-lg bg-white p-1" />
+                            <img src={company.logo.startsWith('http') ? company.logo : `${getApiBaseUrl()}${company.logo}`} alt="Logo" className="h-8 w-auto max-w-[4rem] object-contain rounded-lg bg-white p-1" />
                         ) : (
                             <div className="p-2 bg-emerald-600 rounded-lg">
                                 <Truck className="h-5 w-5" />
@@ -358,7 +365,8 @@ const OfficerDashboard: React.FC = () => {
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                             {/* Tasks table */}
                             <div className="lg:col-span-2 bg-white border border-gray-150 rounded-2xl overflow-hidden shadow-sm h-fit">
-                                <table className="min-w-full divide-y divide-gray-150">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[800px] divide-y divide-gray-150">
                                     <thead className="bg-slate-50">
                                         <tr>
                                             <th className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Pelanggan & Alamat</th>
@@ -430,6 +438,7 @@ const OfficerDashboard: React.FC = () => {
                                         )}
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
 
                             {/* Input Complete Form */}

@@ -8,6 +8,7 @@ class Payment extends Model
 {
     protected $fillable = [
         'customer_id',
+        'invoice_number',
         'amount',
         'month',
         'year',
@@ -15,10 +16,32 @@ class Payment extends Model
         'payment_method',
         'proof_path',
         'payment_date',
+        'due_date',
+        'invoice_date',
+        'paid_at',
+    ];
+
+    protected $casts = [
+        'amount' => 'decimal:2',
+        'payment_date' => 'datetime',
+        'due_date' => 'date',
+        'invoice_date' => 'date',
+        'paid_at' => 'datetime',
     ];
 
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    /**
+     * Auto-set status to Jatuh Tempo when due date has passed.
+     */
+    public function getStatusAttribute($value)
+    {
+        if (in_array($value, ['Unpaid']) && $this->due_date && now()->gt(\Carbon\Carbon::parse($this->due_date))) {
+            return 'Jatuh Tempo';
+        }
+        return $value;
     }
 }

@@ -7,6 +7,8 @@ use App\Models\Customer;
 use App\Models\Officer;
 use App\Models\PickupRequest;
 use App\Models\Payment;
+use App\Models\PaymentMethod;
+use App\Services\PaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -214,31 +216,26 @@ class AdminController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data' => Payment::with('customer')->latest()->get()
+            'data' => Payment::with('customer.user')->latest()->get(),
+            'payment_methods' => PaymentMethod::where('is_active', true)->orderBy('order')->get(),
         ]);
     }
 
     /**
      * Confirm/Approve/Reject customer payments
      */
-    public function confirmPayment(Request $request, Payment $payment): JsonResponse
+    public function confirmPayment(Request $request, Payment $payment, PaymentService $paymentService): JsonResponse
     {
         $request->validate([
             'action' => 'required|in:approve,reject',
         ]);
 
-        if ($request->action === 'approve') {
-            $payment->update(['status' => 'Paid']);
-            $msg = 'Pembayaran berhasil dikonfirmasi.';
-        } else {
-            $payment->update(['status' => 'Unpaid', 'proof_path' => null]);
-            $msg = 'Bukti pembayaran ditolak.';
-        }
+        $payment = $paymentService->confirmPayment($payment, $request->action);
 
         return response()->json([
             'success' => true,
-            'message' => $msg,
-            'data' => $payment
+            'message' => 'Pembayaran berhasil dikonfirmasi.',
+            'data' => $payment->load('customer.user')
         ]);
     }
 
@@ -376,8 +373,6 @@ class AdminController extends Controller
             'address' => 'nullable|string',
             'phone' => 'nullable|string',
             'email' => 'nullable|email|max:255',
-            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
-            'favicon' => 'nullable|mimes:ico,png,jpeg,jpg,svg,gif|max:1024',
         ]);
 
         $company = \App\Models\Company::firstOrCreate(['id' => 1]);
@@ -387,10 +382,12 @@ class AdminController extends Controller
         ]);
 
         if ($request->hasFile('logo')) {
+            $request->validate(['logo' => 'file|max:5120']);
             $dataToUpdate['logo'] = '/storage/' . $request->file('logo')->store('company', 'public');
         }
         
         if ($request->hasFile('favicon')) {
+            $request->validate(['favicon' => 'file|max:2048']);
             $dataToUpdate['favicon'] = '/storage/' . $request->file('favicon')->store('company', 'public');
         }
 

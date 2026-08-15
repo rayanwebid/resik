@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  resik-db:
+    image: mariadb:10.11
+    container_name: resik-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: resik_root_secure_pass
+      MYSQL_DATABASE: resik
+      MYSQL_USER: resik
+      MYSQL_PASSWORD: resik_secure_pass
+    volumes:
+      - resik_dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  resik-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: resik-backend
+    restart: always
+    depends_on:
+      resik-db:
+        condition: service_healthy
+    environment:
+      APP_NAME: Resik
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: https://fastkorecycle.com
+      DB_CONNECTION: mysql
+      DB_HOST: resik-db
+      DB_PORT: 3306
+      DB_DATABASE: resik
+      DB_USERNAME: resik
+      DB_PASSWORD: resik_secure_pass
+      SESSION_DRIVER: database
+      CACHE_STORE: database
+      QUEUE_CONNECTION: sync
+    ports:
+      - "127.0.0.1:8005:80"
+    volumes:
+      - resik_backend_storage:/var/www/html/storage
+
+  resik-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: resik-frontend
+    restart: always
+    ports:
+      - "127.0.0.1:3005:80"
+
+volumes:
+  resik_dbdata:
+  resik_backend_storage:

@@ -3,12 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
     LayoutDashboard, Truck, History, CreditCard, Navigation, LogOut,
-    Clock, DollarSign, AlertCircle, CheckCircle2, Upload, Eye, FileText, MapPin
+    Clock, DollarSign, AlertCircle, CheckCircle2, Upload, Eye, FileText, MapPin,
+    Printer, Download
 } from 'lucide-react';
-import api from '../services/api';
+import api, { getApiBaseUrl } from '../services/api';
 import { useCompany } from '../contexts/CompanyContext';
-import type { PickupRequest, Payment } from '../types';
+import type { PickupRequest, Payment, PaymentMethod } from '../types';
 import SEO from '../components/SEO';
+
+const typeLabel = (type: string): string => {
+    const map: Record<string, string> = {
+        bank_transfer: 'Transfer Bank',
+        qris: 'QRIS',
+        cash: 'Tunai (Cash)',
+        virtual_account: 'Virtual Account',
+    };
+    return map[type] || type;
+};
 
 const CustomerDashboard: React.FC = () => {
     const { user, logout } = useAuth();
@@ -42,11 +53,13 @@ const CustomerDashboard: React.FC = () => {
 
     // Billing Actions State
     const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
-    const [paymentMethod, setPaymentMethod] = useState('Transfer');
+    const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+    const [paymentMethod, setPaymentMethod] = useState('');
     const [proofUrl, setProofUrl] = useState('');
     const [proofPreviewUrl, setProofPreviewUrl] = useState<string | null>(null);
     const [payLoading, setPayLoading] = useState(false);
     const [paySuccess, setPaySuccess] = useState(false);
+    const [showProofUpload, setShowProofUpload] = useState<boolean>(true);
 
     // Selected Items for Details Modal
     const [selectedPickup, setSelectedPickup] = useState<any | null>(null);
@@ -67,6 +80,9 @@ const CustomerDashboard: React.FC = () => {
             const resPayments = await api.get('/customer/payments');
             if (resPayments.data.success) {
                 setPayments(resPayments.data.data);
+                if (resPayments.data.payment_methods && resPayments.data.payment_methods.length > 0) {
+                    setPaymentMethods(resPayments.data.payment_methods);
+                }
             }
         } catch (err) {
             console.error('Customer dashboard load error', err);
@@ -74,6 +90,23 @@ const CustomerDashboard: React.FC = () => {
             setLoading(false);
         }
     };
+
+    // Also try the public payment-methods endpoint as fallback
+    useEffect(() => {
+        api.get('/payment-methods').then((res) => {
+            if (res.data?.success && res.data.data?.length > 0 && paymentMethods.length === 0) {
+                setPaymentMethods(res.data.data);
+            }
+        }).catch(() => {});
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Set default payment method when methods are loaded
+    useEffect(() => {
+        if (paymentMethods.length > 0 && !paymentMethod) {
+            setPaymentMethod(paymentMethods[0].type);
+        }
+    }, [paymentMethods]);
 
     useEffect(() => {
         fetchData();
@@ -144,10 +177,12 @@ const CustomerDashboard: React.FC = () => {
         if (!selectedPayment) return;
         setPayLoading(true);
 
+        const isCash = paymentMethod === 'cash';
+
         try {
             const res = await api.post(`/customer/payments/${selectedPayment.id}/pay`, {
                 payment_method: paymentMethod,
-                proof_path: proofUrl || 'proof_demo.png'
+                proof_path: isCash ? null : (proofUrl || '')
             });
 
             if (res.data.success) {
@@ -181,7 +216,7 @@ const CustomerDashboard: React.FC = () => {
             <div className="md:hidden sticky top-0 z-50 bg-slate-900 text-white flex items-center justify-between px-4 py-3.5 shadow-md shrink-0">
                 <div className="flex items-center space-x-2">
                     {company.logo ? (
-                        <img src={company.logo.startsWith('http') ? company.logo : `http://localhost:8000${company.logo}`} alt="Logo" className="h-7 w-auto max-w-[3.5rem] object-contain rounded-lg bg-white p-0.5" />
+                        <img src={company.logo.startsWith('http') ? company.logo : `${getApiBaseUrl()}${company.logo}`} alt="Logo" className="h-7 w-auto max-w-[3.5rem] object-contain rounded-lg bg-white p-0.5" />
                     ) : (
                         <div className="p-1.5 bg-emerald-600 rounded-lg">
                             <Truck className="h-4 w-4 text-white" />
@@ -206,7 +241,7 @@ const CustomerDashboard: React.FC = () => {
                 <div>
                     <div className="p-6 border-b border-slate-800 flex items-center space-x-2 text-white">
                         {company.logo ? (
-                            <img src={company.logo.startsWith('http') ? company.logo : `http://localhost:8000${company.logo}`} alt="Logo" className="h-8 w-auto max-w-[4rem] object-contain rounded-lg bg-white p-1" />
+                            <img src={company.logo.startsWith('http') ? company.logo : `${getApiBaseUrl()}${company.logo}`} alt="Logo" className="h-8 w-auto max-w-[4rem] object-contain rounded-lg bg-white p-1" />
                         ) : (
                             <div className="p-2 bg-emerald-600 rounded-lg">
                                 <Truck className="h-5 w-5" />
@@ -615,7 +650,8 @@ const CustomerDashboard: React.FC = () => {
                         </div>
 
                         <div className="bg-white border border-gray-150 rounded-2xl overflow-hidden shadow-sm">
-                            <table className="min-w-full divide-y divide-gray-150">
+                            <div className="overflow-x-auto">
+                                <table className="w-full min-w-[800px] divide-y divide-gray-150">
                                 <thead className="bg-slate-50">
                                     <tr>
                                         <th className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tanggal & Waktu</th>
@@ -657,6 +693,7 @@ const CustomerDashboard: React.FC = () => {
                                     )}
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -679,7 +716,8 @@ const CustomerDashboard: React.FC = () => {
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                             {/* Table */}
                             <div className="lg:col-span-2 bg-white border border-gray-150 rounded-2xl overflow-hidden shadow-sm h-fit">
-                                <table className="min-w-full divide-y divide-gray-150">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[800px] divide-y divide-gray-150">
                                     <thead className="bg-slate-50">
                                         <tr>
                                             <th className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Periode Bulan</th>
@@ -727,6 +765,7 @@ const CustomerDashboard: React.FC = () => {
                                         )}
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
 
                             {/* Upload Proof Sidebar Form */}
@@ -741,20 +780,58 @@ const CustomerDashboard: React.FC = () => {
                                         </div>
 
                                         <div>
-                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Metode Transfer</label>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Pilih Metode Pembayaran</label>
                                             <select
                                                 value={paymentMethod}
-                                                onChange={e => setPaymentMethod(e.target.value)}
+                                                onChange={(e) => { setPaymentMethod(e.target.value); setProofPreviewUrl(null); setProofUrl(''); }}
                                                 className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
                                             >
-                                                <option value="Transfer">Transfer Bank Mandiri/BCA</option>
-                                                <option value="QRIS">Doku/QRIS Online</option>
-                                                <option value="Virtual Account">Briva/Virtual Account</option>
+                                                {paymentMethods.length > 0 ? paymentMethods.map((m) => (
+                                                    <option key={m.id} value={m.type}>{typeLabel(m.type)} — {m.name}</option>
+                                                )) : (
+                                                    <option value="">Pilih metode pembayaran</option>
+                                                )}
                                             </select>
                                         </div>
 
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Unggah Bukti Transfer</label>
+                                        {paymentMethod === 'bank_transfer' && paymentMethods.filter((m) => m.type === 'bank_transfer').length > 0 && (
+                                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1">
+                                                <p className="font-bold text-slate-700 mb-1.5">Instruksi Transfer Bank</p>
+                                                {paymentMethods.filter((m) => m.type === 'bank_transfer').map((m) => (
+                                                    <div key={m.id} className="space-y-0.5">
+                                                        <p><span className="text-slate-400">Bank:</span> <span className="font-semibold">{m.bank_name}</span></p>
+                                                        <p><span className="text-slate-400">No. Rekening:</span> <span className="font-mono">{m.account_number}</span></p>
+                                                        <p><span className="text-slate-400">A.N:</span> <span className="font-semibold">{m.account_holder}</span></p>
+                                                    </div>
+                                                ))}
+                                                <p className="text-[10px] text-slate-400 italic">Transfer sesuai tagihan, lalu unggah bukti di bawah.</p>
+                                            </div>
+                                        )}
+
+                                        {paymentMethod === 'qris' && paymentMethods.some((m) => m.type === 'qris') && (
+                                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
+                                                <p className="font-bold text-slate-700">Pembayaran via QRIS Statis</p>
+                                                {paymentMethods.filter((m) => m.type === 'qris').map((m) => (
+                                                    <div key={m.id} className="space-y-1">
+                                                        {m.image_path && (
+                                                            <img src={m.image_path} alt="QRIS" className="w-28 h-28 object-contain" />
+                                                        )}
+                                                        <p className="text-[10px] text-slate-400">{m.description || 'Pindai kode QRIS untuk membayar tagihan.'}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {paymentMethod === 'cash' && (
+                                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+                                                <p className="font-bold text-slate-700">Pembayaran Tunai (Cash)</p>
+                                                <p className="text-slate-500">Bayar langsung ke petugas lapangan. Tidak perlu upload bukti.</p>
+                                            </div>
+                                        )}
+
+                                        {paymentMethod !== 'cash' && (
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Unggah Bukti Transfer / QRIS</label>
                                             {proofPreviewUrl ? (
                                                 <div className="relative rounded-xl overflow-hidden border border-slate-205 aspect-video bg-slate-50 flex items-center justify-center group">
                                                     <img src={proofPreviewUrl} alt="Bukti Transfer" className="object-contain w-full h-full p-1" />
@@ -798,6 +875,7 @@ const CustomerDashboard: React.FC = () => {
                                                 </div>
                                             )}
                                         </div>
+                                        )}
 
                                         <div className="flex gap-2 pt-2">
                                             <button
@@ -968,22 +1046,48 @@ const CustomerDashboard: React.FC = () => {
                             <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-xl space-y-2.5 text-xs text-slate-600">
                                 <p className="font-bold text-slate-800 flex items-center gap-1.5">
                                     <CreditCard className="h-4 w-4 text-emerald-600" />
-                                    Petunjuk Transfer Pembayaran
+                                    Metode Pembayaran yang Tersedia
                                 </p>
-                                <p className="leading-relaxed">
-                                    Silakan transfer nominal tagihan persis ke rekening loket penjemputan sampah berikut:
-                                </p>
-                                <div className="bg-white p-2.5 rounded-lg border border-slate-150 font-mono text-slate-800 space-y-1">
-                                    <p><span className="font-bold text-slate-500">Bank BCA:</span> 8831002244</p>
-                                    <p><span className="font-bold text-slate-500">Bank Mandiri:</span> 132-00-552211-9</p>
-                                    <p><span className="font-bold text-slate-500">A.N:</span> {company.name} Cleaners</p>
-                                </div>
+                                {paymentMethods.filter((m) => m.type === 'bank_transfer').length > 0 && (
+                                    <div className="space-y-1">
+                                        <p className="font-semibold text-slate-700">Transfer Bank:</p>
+                                        {paymentMethods.filter((m) => m.type === 'bank_transfer').map((m) => (
+                                            <div key={m.id} className="bg-white p-2.5 rounded-lg border border-slate-150 font-mono text-slate-800">
+                                                <p><span className="font-bold text-slate-500">{m.bank_name}:</span> {m.account_number}</p>
+                                                <p><span className="font-bold text-slate-500">A.N:</span> {m.account_holder}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {paymentMethods.some((m) => m.type === 'qris') && selectedInvoice.status !== 'Unpaid' && selectedInvoice.status !== 'Jatuh Tempo' && (
+                                    <div className="space-y-1">
+                                        <p className="font-semibold text-slate-700">QRIS Statis:</p>
+                                        {paymentMethods.filter((m) => m.type === 'qris').map((m) => (
+                                            <div key={m.id} className="flex items-start gap-2">
+                                                {m.image_path && <img src={m.image_path} alt="QRIS" className="w-20 h-20 object-contain" />}
+                                                <p className="text-[10px] text-slate-400">{m.description || 'Pindai QRIS untuk membayar.'}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {paymentMethods.some((m) => m.type === 'cash') && (
+                                    <p className="font-semibold text-slate-700">Tunai (Cash): Bayar langsung ke petugas lapangan.</p>
+                                )}
                                 <p className="text-[10px] text-slate-400 italic">
                                     Setelah transfer, harap melampirkan foto struk bukti transfer di form pembayaran.
                                 </p>
                             </div>
                         </div>
                         <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+                            {(selectedInvoice.status === 'Paid') && (
+                                <button
+                                    onClick={() => window.open(`${getApiBaseUrl()}/api/customer/payments/${selectedInvoice.id}/invoice?download=1`, '_blank')}
+                                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-650 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                                >
+                                    <Printer className="h-3.5 w-3.5" />
+                                    Print / Save PDF
+                                </button>
+                            )}
                             <button
                                 onClick={() => setSelectedInvoice(null)}
                                 className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold rounded-xl transition-colors"

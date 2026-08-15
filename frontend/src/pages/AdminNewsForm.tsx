@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import api from '../services/api';
+import api, { getApiBaseUrl } from '../services/api';
 import { ArrowLeft, Save, Image as ImageIcon, XCircle } from 'lucide-react';
 import { useCompany } from '../contexts/CompanyContext';
 
@@ -24,7 +24,7 @@ const AdminNewsForm: React.FC = () => {
                     const data = res.data.data;
                     setForm({ title: data.title, summary: data.summary || '', content: data.content });
                     if (data.image) {
-                        setImagePreview(data.image.startsWith('http') ? data.image : `http://localhost:8000${data.image}`);
+                        setImagePreview(data.image.startsWith('http') ? data.image : `${getApiBaseUrl()}${data.image}`);
                     }
                 })
                 .catch(err => {
@@ -58,15 +58,9 @@ const AdminNewsForm: React.FC = () => {
             }
 
             if (isEdit) {
-                // In Laravel, PUT with multipart form data sometimes has issues, 
-                // so we use POST and can add _method field. But we already changed API to accept POST.
-                await api.post(`/admin/news/${id}`, formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
+                await api.post(`/admin/news/${id}`, formData);
             } else {
-                await api.post('/admin/news', formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
+                await api.post('/admin/news', formData);
             }
 
             alert(isEdit ? 'Berita berhasil diperbarui!' : 'Berita berhasil dibuat!');

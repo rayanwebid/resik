@@ -6,12 +6,12 @@ import {
     Clock, UserPlus, ArrowRightLeft, Truck,
     CheckCircle2, XCircle, AlertCircle, RefreshCw,
     ChevronDown, Search, Shield, TrendingUp, Banknote, Eye,
-    FileText, Globe, Plus, Trash2, Edit
+    FileText, Globe, Plus, Trash2, Edit, MapPin, Printer, X
 } from 'lucide-react';
-import api from '../services/api';
+import api, { getApiBaseUrl } from '../services/api';
 import { useCompany } from '../contexts/CompanyContext';
-import type { User, Officer, PickupRequest, Payment } from '../types';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import type { User, Officer, PickupRequest, Payment, WorkRegion, PaymentMethod } from '../types';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import SEO from '../components/SEO';
@@ -24,11 +24,42 @@ L.Icon.Default.mergeOptions({
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
+// Dynamic Map Controller to center map view on active officers
+const MapController: React.FC<{ officers: Officer[] }> = ({ officers }) => {
+    const map = useMap();
+    useEffect(() => {
+        const points = officers
+            .filter(o => o.latitude != null && o.longitude != null && !isNaN(parseFloat(String(o.latitude))) && !isNaN(parseFloat(String(o.longitude))))
+            .map(o => [parseFloat(String(o.latitude)), parseFloat(String(o.longitude))] as [number, number]);
+
+        if (points.length === 1) {
+            map.setView(points[0], 14);
+        } else if (points.length > 1) {
+            const bounds = L.latLngBounds(points);
+            if (bounds.isValid()) {
+                map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+            }
+        }
+    }, [officers, map]);
+
+    return null;
+};
+
+const typeLabel = (type: string): string => {
+    const map: Record<string, string> = {
+        bank_transfer: 'Transfer Bank',
+        qris: 'QRIS',
+        cash: 'Tunai (Cash)',
+        virtual_account: 'Virtual Account',
+    };
+    return map[type] || type;
+};
+
 const AdminDashboard: React.FC = () => {
     const { user, logout } = useAuth();
     const { company, refreshCompany } = useCompany();
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState<'overview' | 'customers' | 'officers' | 'assignments' | 'payments' | 'cms'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'customers' | 'officers' | 'assignments' | 'payments' | 'payment_methods' | 'cms' | 'regions'>('overview');
 
     // States
     const [stats, setStats] = useState({
@@ -44,8 +75,20 @@ const AdminDashboard: React.FC = () => {
     const [pickups, setPickups] = useState<PickupRequest[]>([]);
     const [payments, setPayments] = useState<Payment[]>([]);
     const [monthlyRevenue, setMonthlyRevenue] = useState<{ month: string; revenue: number }[]>([]);
-    const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+
+    // Work Regions states
+    const [workRegions, setWorkRegions] = useState<WorkRegion[]>([]);
+    const [searchRegion, setSearchRegion] = useState('');
+    const [showWorkRegionModal, setShowWorkRegionModal] = useState(false);
+    const [editingWorkRegion, setEditingWorkRegion] = useState<WorkRegion | null>(null);
+    const [workRegionForm, setWorkRegionForm] = useState({
+        name: '',
+        code: '',
+        description: '',
+        is_active: true,
+    });
+    const [workRegionLoading, setWorkRegionLoading] = useState(false);
 
     // CMS & News management states
     const [news, setNews] = useState<any[]>([]);
@@ -53,6 +96,22 @@ const AdminDashboard: React.FC = () => {
     const [newsForm, setNewsForm] = useState({ title: '', summary: '', content: '', image: '' });
     const [isNewsModalOpen, setIsNewsModalOpen] = useState(false);
     const [cmsSubTab, setCmsSubTab] = useState<'news' | 'profile'>('news');
+
+    // Payment Methods management states
+    const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+    const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
+    const [editingPaymentMethod, setEditingPaymentMethod] = useState<PaymentMethod | null>(null);
+    const [paymentMethodForm, setPaymentMethodForm] = useState({
+        name: '',
+        type: 'bank_transfer',
+        bank_name: '',
+        account_number: '',
+        account_holder: '',
+        image_path: '',
+        description: '',
+    });
+    const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
+    const [paymentMethodLoading, setPaymentMethodLoading] = useState(false);
     const [settings, setSettings] = useState({
         name: 'SI-SAMPAH',
         history: '',
@@ -112,13 +171,15 @@ const AdminDashboard: React.FC = () => {
     const fetchData = async (showRefreshing = false) => {
         if (showRefreshing) setRefreshing(true);
         try {
-            const [resDash, resCust, resOff, resPayments, resNews, resSettings] = await Promise.allSettled([
+            const [resDash, resCust, resOff, resPayments, resNews, resSettings, resWorkRegions, resPaymentMethods] = await Promise.allSettled([
                 api.get('/admin/dashboard'),
                 api.get('/admin/customers'),
                 api.get('/admin/officers'),
                 api.get('/admin/payments'),
                 api.get('/admin/news'),
                 api.get('/admin/settings'),
+                api.get('/admin/work-regions'),
+                api.get('/admin/payment-methods'),
             ]);
 
             if (resDash.status === 'fulfilled' && resDash.value.data.success) {
@@ -149,11 +210,80 @@ const AdminDashboard: React.FC = () => {
             if (resSettings.status === 'fulfilled' && resSettings.value.data.success) {
                 setSettings(resSettings.value.data.data);
             }
+            if (resWorkRegions.status === 'fulfilled' && resWorkRegions.value.data.success) {
+                setWorkRegions(resWorkRegions.value.data.data);
+            }
+            if (resPaymentMethods.status === 'fulfilled' && resPaymentMethods.value.data.success) {
+                setPaymentMethods(resPaymentMethods.value.data.data);
+            }
         } catch (err) {
             console.error('Admin dashboard load error', err);
         } finally {
-            setLoading(false);
             setRefreshing(false);
+        }
+    };
+
+    const fetchWorkRegions = async () => {
+        try {
+            const res = await api.get('/admin/work-regions');
+            if (res.data.success) {
+                setWorkRegions(res.data.data);
+            }
+        } catch (err) {
+            console.error('Fetch work regions error', err);
+        }
+    };
+
+    const handleSaveWorkRegion = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setWorkRegionLoading(true);
+        try {
+            if (editingWorkRegion) {
+                const res = await api.put(`/admin/work-regions/${editingWorkRegion.id}`, workRegionForm);
+                if (res.data.success) {
+                    alert(res.data.message);
+                }
+            } else {
+                const res = await api.post('/admin/work-regions', workRegionForm);
+                if (res.data.success) {
+                    alert(res.data.message);
+                }
+            }
+            setShowWorkRegionModal(false);
+            setEditingWorkRegion(null);
+            setWorkRegionForm({ name: '', code: '', description: '', is_active: true });
+            fetchWorkRegions();
+        } catch (err: any) {
+            console.error(err);
+            alert(err.response?.data?.message || 'Gagal menyimpan data wilayah kerja.');
+        } finally {
+            setWorkRegionLoading(false);
+        }
+    };
+
+    const handleToggleWorkRegion = async (id: number) => {
+        try {
+            const res = await api.post(`/admin/work-regions/${id}/toggle`);
+            if (res.data.success) {
+                fetchWorkRegions();
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Gagal mengubah status wilayah kerja.');
+        }
+    };
+
+    const handleDeleteWorkRegion = async (id: number, name: string) => {
+        if (!confirm(`Apakah Anda yakin ingin menghapus wilayah kerja "${name}"?`)) return;
+        try {
+            const res = await api.delete(`/admin/work-regions/${id}`);
+            if (res.data.success) {
+                alert(res.data.message);
+                fetchWorkRegions();
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Gagal menghapus wilayah kerja.');
         }
     };
 
@@ -206,14 +336,14 @@ const AdminDashboard: React.FC = () => {
         try {
             const formData = new FormData();
             Object.keys(settings).forEach(key => {
-                formData.append(key, (settings as any)[key] || '');
+                if (key !== 'logo' && key !== 'favicon') {
+                    formData.append(key, (settings as any)[key] || '');
+                }
             });
             if (settingsLogo) formData.append('logo', settingsLogo);
             if (settingsFavicon) formData.append('favicon', settingsFavicon);
 
-            const res = await api.post('/admin/settings', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            const res = await api.post('/admin/settings', formData);
             if (res.data.success) {
                 setSettingsSuccess(true);
                 setTimeout(() => setSettingsSuccess(false), 4000);
@@ -344,6 +474,79 @@ const AdminDashboard: React.FC = () => {
         finally { setPaymentActionLoading(false); }
     };
 
+    const openPaymentMethodModal = (method: PaymentMethod | null = null) => {
+        setEditingPaymentMethod(method);
+        if (method) {
+            setPaymentMethodForm({
+                name: method.name,
+                type: method.type,
+                bank_name: method.bank_name || '',
+                account_number: method.account_number || '',
+                account_holder: method.account_holder || '',
+                image_path: method.image_path || '',
+                description: method.description || '',
+            });
+        } else {
+            setPaymentMethodForm({
+                name: '',
+                type: 'bank_transfer',
+                bank_name: '',
+                account_number: '',
+                account_holder: '',
+                image_path: '',
+                description: '',
+            });
+        }
+        setShowPaymentMethodModal(true);
+    };
+
+    const closePaymentMethodModal = () => {
+        setShowPaymentMethodModal(false);
+        setEditingPaymentMethod(null);
+        setPaymentMethodForm({
+            name: '',
+            type: 'bank_transfer',
+            bank_name: '',
+            account_number: '',
+            account_holder: '',
+            image_path: '',
+            description: '',
+        });
+    };
+
+    const handleSavePaymentMethod = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setPaymentMethodLoading(true);
+        try {
+            const payload: any = { ...paymentMethodForm };
+            if (editingPaymentMethod) {
+                const res = await api.put(`/admin/payment-methods/${editingPaymentMethod.id}`, payload);
+                if (res.data.success) { alert('Metode pembayaran berhasil diperbarui.'); fetchData(false); }
+            } else {
+                const res = await api.post('/admin/payment-methods', payload);
+                if (res.data.success) { alert('Metode pembayaran berhasil ditambahkan.'); fetchData(false); }
+            }
+            setShowPaymentMethodModal(false);
+            setEditingPaymentMethod(null);
+        } catch (err) { console.error(err); alert('Gagal menyimpan metode pembayaran.'); }
+        finally { setPaymentMethodLoading(false); }
+    };
+
+    const handleDeletePaymentMethod = async (id: number, name: string) => {
+        if (!confirm(`Apakah Anda yakin ingin menghapus "${name}"?`)) return;
+        try {
+            const res = await api.delete(`/admin/payment-methods/${id}`);
+            if (res.data.success) { alert('Metode pembayaran berhasil dihapus.'); fetchData(false); }
+        } catch (err) { console.error(err); alert('Gagal menghapus metode pembayaran.'); }
+    };
+
+    const togglePaymentMethod = async (method: PaymentMethod) => {
+        try {
+            await api.put(`/admin/payment-methods/${method.id}`, { ...method, is_active: !method.is_active });
+            fetchData(false);
+        } catch (err) { console.error(err); alert('Gagal mengubah status metode pembayaran.'); }
+    };
+
     const filteredCustomers = customers.filter(c =>
         (c.user?.name ?? c.name ?? '').toLowerCase().includes(searchCustomer.toLowerCase()) ||
         (c.user?.email ?? c.email ?? '').toLowerCase().includes(searchCustomer.toLowerCase())
@@ -375,8 +578,10 @@ const AdminDashboard: React.FC = () => {
         { id: 'overview', label: 'Ringkasan', icon: LayoutDashboard, badge: null },
         { id: 'customers', label: 'Verifikasi Pelanggan', icon: UserCheck, badge: stats.pending_approvals || null },
         { id: 'officers', label: 'Petugas Lapangan', icon: UserPlus, badge: null },
+        { id: 'regions', label: 'Wilayah Kerja', icon: MapPin, badge: null },
         { id: 'assignments', label: 'Penugasan Pickup', icon: ArrowRightLeft, badge: pickups.filter(p => !p.officer_id).length || null },
         { id: 'payments', label: 'Verifikasi Pembayaran', icon: CreditCard, badge: stats.unpaid_bills || null },
+        { id: 'payment_methods', label: 'Metode Pembayaran', icon: Banknote, badge: null },
         { id: 'cms', label: 'Konten & Berita', icon: FileText, badge: null },
     ];
 
@@ -389,7 +594,7 @@ const AdminDashboard: React.FC = () => {
                 <div className="px-6 py-5 border-b border-slate-700/60">
                     <div className="flex items-center gap-3">
                         {company.logo ? (
-                            <img src={company.logo.startsWith('http') ? company.logo : `http://localhost:8000${company.logo}`} alt="Logo" className="h-10 w-auto max-w-[4rem] object-contain rounded-xl bg-white p-1 shadow-sm" />
+                            <img src={company.logo.startsWith('http') ? company.logo : `${getApiBaseUrl()}${company.logo}`} alt="Logo" className="h-10 w-auto max-w-[4rem] object-contain rounded-xl bg-white p-1 shadow-sm" />
                         ) : (
                             <div className="p-2 bg-emerald-500 rounded-xl shadow-lg shadow-emerald-500/30">
                                 <Shield className="h-5 w-5 text-white" />
@@ -488,9 +693,10 @@ const AdminDashboard: React.FC = () => {
                                 {item.id === 'overview' ? 'Ringkasan' :
                                     item.id === 'customers' ? 'Pelanggan' :
                                         item.id === 'officers' ? 'Petugas' :
-                                            item.id === 'assignments' ? 'Pickup' :
-                                                item.id === 'payments' ? 'Iuran' :
-                                                    item.id === 'cms' ? 'Berita' : item.label}
+                                            item.id === 'regions' ? 'Wilayah' :
+                                                item.id === 'assignments' ? 'Pickup' :
+                                                    item.id === 'payments' ? 'Iuran' :
+                                                        item.id === 'cms' ? 'Berita' : item.label}
                             </span>
                             {item.badge ? (
                                 <span className="absolute top-0.5 right-2 text-[8px] font-bold px-1 py-0.2 bg-red-500 text-white rounded-full scale-90">
@@ -654,7 +860,8 @@ const AdminDashboard: React.FC = () => {
                             </div>
 
                             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                                <table className="min-w-full divide-y divide-slate-100">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[800px] divide-y divide-slate-100">
                                     <thead className="bg-slate-50">
                                         <tr>
                                             {['Pelanggan', 'NIK', 'Alamat', 'Status', 'Aksi'].map(h => (
@@ -728,6 +935,7 @@ const AdminDashboard: React.FC = () => {
                                         )}
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -740,14 +948,16 @@ const AdminDashboard: React.FC = () => {
                                 <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between mb-2">
                                     <h3 className="font-bold text-slate-900">Peta Lokasi Petugas (Real-time)</h3>
                                 </div>
-                                <MapContainer center={[-6.917464, 107.619123]} zoom={12} style={{ height: '400px', width: '100%', zIndex: 1, borderRadius: '0.75rem' }}>
+                                <MapContainer center={[-8.366022, 114.165939]} zoom={13} style={{ height: '400px', width: '100%', zIndex: 1, borderRadius: '0.75rem' }}>
                                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                                    <MapController officers={officers} />
                                     {officers.filter(o => o.latitude && o.longitude).map((o: any) => (
-                                        <Marker key={o.id} position={[o.latitude, o.longitude]}>
+                                        <Marker key={o.id} position={[parseFloat(String(o.latitude)), parseFloat(String(o.longitude))]}>
                                             <Popup>
-                                                <div className="text-center">
-                                                    <strong>{o.name ?? o.user?.name}</strong><br />
-                                                    Terakhir di update.
+                                                <div className="text-center p-1">
+                                                    <strong className="text-sm font-bold text-slate-900">{o.name ?? o.user?.name}</strong><br />
+                                                    <span className="text-xs text-slate-600">Wilayah: {o.region ?? '-'}</span><br />
+                                                    <span className="text-[11px] text-slate-400 font-mono">[{o.latitude}, {o.longitude}]</span>
                                                 </div>
                                             </Popup>
                                         </Marker>
@@ -762,7 +972,8 @@ const AdminDashboard: React.FC = () => {
                                         <h3 className="font-bold text-slate-900">Daftar Petugas Lapangan</h3>
                                         <p className="text-xs text-slate-400 mt-0.5">Total: {officers.length} petugas terdaftar</p>
                                     </div>
-                                    <table className="min-w-full divide-y divide-slate-100">
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full min-w-[800px] divide-y divide-slate-100">
                                         <thead className="bg-slate-50">
                                             <tr>
                                                 {['Petugas', 'NIK', 'Wilayah', 'Status', 'Aksi'].map(h => (
@@ -812,6 +1023,7 @@ const AdminDashboard: React.FC = () => {
                                             )}
                                         </tbody>
                                     </table>
+                                    </div>
                                 </div>
 
                                 {/* Register Officer Form */}
@@ -862,7 +1074,7 @@ const AdminDashboard: React.FC = () => {
                                                     value={officerForm.address}
                                                     onChange={e => setOfficerForm({ ...officerForm, address: e.target.value })}
                                                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500 transition-colors"
-                                                    placeholder="Jl. Contoh No. 1, Bandung"
+                                                    placeholder="Jl. Contoh No. 1, Genteng, Banyuwangi"
                                                     required
                                                 />
                                             </div>
@@ -873,8 +1085,9 @@ const AdminDashboard: React.FC = () => {
                                                     onChange={e => setOfficerForm({ ...officerForm, region: e.target.value })}
                                                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
                                                 >
-                                                    {['Coblong', 'Cicendo', 'Sukajadi', 'Bandung Wetan', 'Sumur Bandung', 'Andir', 'Cibeunying', 'Astana Anyar'].map(r => (
-                                                        <option key={r} value={r}>{r}</option>
+                                                    <option value="">-- Pilih Wilayah Kerja --</option>
+                                                    {workRegions.map((r: any) => (
+                                                        <option key={r.id} value={r.name}>{r.name} ({r.code})</option>
                                                     ))}
                                                 </select>
                                             </div>
@@ -1084,7 +1297,8 @@ const AdminDashboard: React.FC = () => {
 
                             {/* ── Daftar Penugasan ── */}
                             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                                <table className="min-w-full divide-y divide-slate-100">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[800px] divide-y divide-slate-100">
                                     <thead className="bg-slate-50">
                                         <tr>
                                             {['Pelanggan', 'Jadwal', 'Jenis Sampah', 'Berat', 'Status', 'Petugas', 'Aksi'].map(h => (
@@ -1156,6 +1370,7 @@ const AdminDashboard: React.FC = () => {
                                         )}
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -1180,7 +1395,8 @@ const AdminDashboard: React.FC = () => {
                             </div>
 
                             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                                <table className="min-w-full divide-y divide-slate-100">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[800px] divide-y divide-slate-100">
                                     <thead className="bg-slate-50">
                                         <tr>
                                             {['Pelanggan', 'Periode', 'Jumlah', 'Metode', 'Status', 'Bukti', 'Aksi'].map(h => (
@@ -1243,7 +1459,13 @@ const AdminDashboard: React.FC = () => {
                                                             Verifikasi
                                                         </button>
                                                     ) : (
-                                                        <span className="text-xs text-slate-400 italic">Selesai</span>
+                                                        <button
+                                                            onClick={() => window.open(`${getApiBaseUrl()}/api/admin/payments/${pay.id}/invoice?download=1`, '_blank')}
+                                                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-650 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                                                        >
+                                                            <Printer className="h-3.5 w-3.5" />
+                                                            Print / Save PDF
+                                                        </button>
                                                     )}
                                                 </td>
                                             </tr>
@@ -1256,6 +1478,86 @@ const AdminDashboard: React.FC = () => {
                                         )}
                                     </tbody>
                                 </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ═══ TAB 6: METODE PEMBAYARAN ══════════════ */}
+                    {activeTab === 'payment_methods' && (
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-2xl font-bold text-slate-800">Metode Pembayaran</h2>
+                                <button
+                                    onClick={() => openPaymentMethodModal()}
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+                                >
+                                    <Plus className="h-4 w-4" /> Tambah Metode
+                                </button>
+                            </div>
+
+                            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[700px] divide-y divide-slate-100">
+                                        <thead className="bg-slate-50">
+                                            <tr>
+                                                {['Metode', 'Tipe', 'Detail', 'Status', 'Aksi'].map(h => (
+                                                    <th key={h} className="px-5 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">{h}</th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 text-sm">
+                                            {paymentMethods.length > 0 ? paymentMethods.map((m) => (
+                                                <tr key={m.id} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="px-5 py-4 font-medium text-slate-800">{m.name}</td>
+                                                    <td className="px-5 py-4 text-slate-600">{typeLabel(m.type)}</td>
+                                                    <td className="px-5 py-4 text-slate-500 font-mono text-xs">
+                                                        {m.type === 'bank_transfer' && (
+                                                            <span>{m.bank_name} • {m.account_number} • {m.account_holder}</span>
+                                                        )}
+                                                        {m.type === 'qris' && m.image_path && (
+                                                            <img src={m.image_path} alt="QRIS" className="w-10 h-10 object-contain" />
+                                                        )}
+                                                        {m.type === 'cash' && <span>Tunai langsung ke petugas</span>}
+                                                        {m.type === 'virtual_account' && (
+                                                            <span>{m.bank_name} • {m.account_number}</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-5 py-4">
+                                                        <button
+                                                            onClick={() => togglePaymentMethod(m)}
+                                                            className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors ${m.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}
+                                                        >
+                                                            {m.is_active ? 'Aktif' : 'Non-aktif'}
+                                                        </button>
+                                                    </td>
+                                                    <td className="px-5 py-4">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <button
+                                                                onClick={() => openPaymentMethodModal(m)}
+                                                                className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                                                            >
+                                                                <Edit className="h-3.5 w-3.5" /> Edit
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeletePaymentMethod(m.id, m.name)}
+                                                                className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                                                            >
+                                                                <Trash2 className="h-3.5 w-3.5" /> Hapus
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )) : (
+                                                <tr>
+                                                    <td colSpan={5} className="px-5 py-12 text-center text-slate-400 italic text-sm">
+                                                        Belum ada metode pembayaran yang dikonfigurasi.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -1292,7 +1594,8 @@ const AdminDashboard: React.FC = () => {
 
                                     {/* Table of news */}
                                     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                                        <table className="min-w-full divide-y divide-slate-150 text-xs">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full min-w-[800px] divide-y divide-slate-150 text-xs">
                                             <thead className="bg-slate-50">
                                                 <tr>
                                                     <th className="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Judul & Ilustrasi</th>
@@ -1350,6 +1653,7 @@ const AdminDashboard: React.FC = () => {
                                                 )}
                                             </tbody>
                                         </table>
+                                        </div>
                                     </div>
                                 </div>
                             ) : (
@@ -1375,7 +1679,7 @@ const AdminDashboard: React.FC = () => {
                                                 <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1.5">Logo Aplikasi</label>
                                                 <input
                                                     type="file"
-                                                    accept="image/*"
+                                                    accept=".ico,.png,.jpg,.jpeg,.svg,.webp,image/*"
                                                     onChange={e => setSettingsLogo(e.target.files?.[0] || null)}
                                                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs bg-white"
                                                 />
@@ -1385,7 +1689,7 @@ const AdminDashboard: React.FC = () => {
                                                 <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1.5">Favicon (Ikon Tab)</label>
                                                 <input
                                                     type="file"
-                                                    accept=".ico,.png"
+                                                    accept=".ico,.png,.jpg,.jpeg,.svg,.webp,image/*"
                                                     onChange={e => setSettingsFavicon(e.target.files?.[0] || null)}
                                                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs bg-white"
                                                 />
@@ -1478,8 +1782,234 @@ const AdminDashboard: React.FC = () => {
                             )}
                         </div>
                     )}
+
+                    {/* ═══ TAB 7: WILAYAH KERJA ══════════════════ */}
+                    {activeTab === 'regions' && (
+                        <div className="space-y-6">
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+                                    <div>
+                                        <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                                            <MapPin className="h-5 w-5 text-emerald-600" />
+                                            Manajemen Wilayah Kerja (Zonasi Layanan)
+                                        </h3>
+                                        <p className="text-xs text-slate-400 mt-1">
+                                            Kelola zonasi area operasional penjemputan sampah dan alokasi beban kerja petugas.
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            setEditingWorkRegion(null);
+                                            setWorkRegionForm({ name: '', code: '', description: '', is_active: true });
+                                            setShowWorkRegionModal(true);
+                                        }}
+                                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+                                    >
+                                        <Plus className="h-4 w-4" /> Tambah Wilayah Kerja
+                                    </button>
+                                </div>
+
+                                {/* Filter Search */}
+                                <div className="mt-4 flex items-center gap-3">
+                                    <div className="relative flex-1 max-w-md">
+                                        <Search className="h-4 w-4 absolute left-3 top-2.5 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Cari wilayah kerja berdasarkan nama atau kode..."
+                                            value={searchRegion}
+                                            onChange={e => setSearchRegion(e.target.value)}
+                                            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-emerald-500 bg-slate-50"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Regions Table */}
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[700px] divide-y divide-slate-100">
+                                        <thead className="bg-slate-50">
+                                            <tr>
+                                                {['Kode Wilayah', 'Nama Wilayah Kerja', 'Cakupan Area / Deskripsi', 'Jumlah Petugas', 'Status', 'Aksi'].map(h => (
+                                                    <th key={h} className="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">{h}</th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 text-sm">
+                                            {workRegions.filter(r =>
+                                                r.name.toLowerCase().includes(searchRegion.toLowerCase()) ||
+                                                r.code.toLowerCase().includes(searchRegion.toLowerCase())
+                                            ).length > 0 ? (
+                                                workRegions
+                                                    .filter(r =>
+                                                        r.name.toLowerCase().includes(searchRegion.toLowerCase()) ||
+                                                        r.code.toLowerCase().includes(searchRegion.toLowerCase())
+                                                    )
+                                                    .map((r) => (
+                                                        <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
+                                                            <td className="px-6 py-4">
+                                                                <span className="font-mono text-xs font-bold px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100">
+                                                                    {r.code}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-6 py-4">
+                                                                <p className="font-bold text-slate-800">{r.name}</p>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-xs text-slate-500 max-w-sm">
+                                                                {r.description || <span className="italic text-slate-300">Tidak ada deskripsi</span>}
+                                                            </td>
+                                                            <td className="px-6 py-4">
+                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg">
+                                                                    <Truck className="h-3.5 w-3.5 text-slate-500" />
+                                                                    {r.officers_count ?? 0} Petugas
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-6 py-4">
+                                                                <span className={statusBadge(r.is_active ? 'active' : 'inactive')}>
+                                                                    {r.is_active ? 'Aktif' : 'Nonaktif'}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                                <div className="flex items-center gap-2">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setEditingWorkRegion(r);
+                                                                            setWorkRegionForm({
+                                                                                name: r.name,
+                                                                                code: r.code,
+                                                                                description: r.description || '',
+                                                                                is_active: r.is_active,
+                                                                            });
+                                                                            setShowWorkRegionModal(true);
+                                                                        }}
+                                                                        className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors cursor-pointer"
+                                                                        title="Edit Wilayah"
+                                                                    >
+                                                                        <Edit className="h-4 w-4" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleToggleWorkRegion(r.id)}
+                                                                        className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all ${
+                                                                            r.is_active
+                                                                                ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200'
+                                                                                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                                                        }`}
+                                                                    >
+                                                                        {r.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDeleteWorkRegion(r.id, r.name)}
+                                                                        className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors cursor-pointer"
+                                                                        title="Hapus Wilayah"
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic">
+                                                        Tidak ada data wilayah kerja. Klik "+ Tambah Wilayah Kerja" untuk membuat baru.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </main>
+
+            {/* ═══ MODAL WORK REGION (TAMBAH / EDIT) ══════════════════ */}
+            {showWorkRegionModal && (
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in duration-150 border border-slate-100">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                                <MapPin className="h-5 w-5 text-emerald-600" />
+                                {editingWorkRegion ? 'Edit Wilayah Kerja' : 'Tambah Wilayah Kerja Baru'}
+                            </h3>
+                            <button
+                                onClick={() => setShowWorkRegionModal(false)}
+                                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+                            >
+                                <XCircle className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveWorkRegion} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Nama Wilayah Kerja</label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="Contoh: Genteng, Banyuwangi Kota, Giri"
+                                    value={workRegionForm.name}
+                                    onChange={e => setWorkRegionForm({ ...workRegionForm, name: e.target.value })}
+                                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Kode Wilayah</label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="Contoh: W-GNT, W-BWI, W-GRI"
+                                    value={workRegionForm.code}
+                                    onChange={e => setWorkRegionForm({ ...workRegionForm, code: e.target.value.toUpperCase() })}
+                                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:border-emerald-500 uppercase"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Deskripsi / Cakupan Area</label>
+                                <textarea
+                                    rows={3}
+                                    placeholder="Detail kelurahan atau daerah cakupan operasional..."
+                                    value={workRegionForm.description}
+                                    onChange={e => setWorkRegionForm({ ...workRegionForm, description: e.target.value })}
+                                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-1">
+                                <input
+                                    type="checkbox"
+                                    id="work_region_active"
+                                    checked={workRegionForm.is_active}
+                                    onChange={e => setWorkRegionForm({ ...workRegionForm, is_active: e.target.checked })}
+                                    className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                />
+                                <label htmlFor="work_region_active" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                                    Aktifkan Wilayah Kerja Ini
+                                </label>
+                            </div>
+
+                            <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowWorkRegionModal(false)}
+                                    className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-semibold cursor-pointer"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={workRegionLoading}
+                                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer"
+                                >
+                                    {workRegionLoading ? 'Menyimpan...' : 'Simpan Data'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Modal Detail Pelanggan */}
             {selectedCustomer && (
@@ -1547,7 +2077,7 @@ const AdminDashboard: React.FC = () => {
                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Foto Rumah</p>
                                     <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50 aspect-video flex items-center justify-center">
                                         <img
-                                            src={selectedCustomer.house_photo.startsWith('http') ? selectedCustomer.house_photo : `http://localhost:8000/storage/${selectedCustomer.house_photo}`}
+                                            src={selectedCustomer.house_photo.startsWith('http') ? selectedCustomer.house_photo : `${getApiBaseUrl()}/storage/${selectedCustomer.house_photo}`}
                                             alt="Foto Rumah"
                                             className="object-cover w-full h-full"
                                             onError={(e) => {
@@ -1592,6 +2122,122 @@ const AdminDashboard: React.FC = () => {
                 </div>
             )}
 
+            {/* Modal Metode Pembayaran */}
+            {showPaymentMethodModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+                    <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl border border-slate-100">
+                        <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                            <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                                <Banknote className="h-5 w-5 text-emerald-600" />
+                                {editingPaymentMethod ? 'Edit Metode Pembayaran' : 'Tambah Metode Pembayaran'}
+                            </h3>
+                            <button
+                                onClick={closePaymentMethodModal}
+                                className="text-slate-400 hover:text-slate-600 text-xl font-bold transition-colors"
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <form onSubmit={handleSavePaymentMethod}>
+                            <div className="px-6 py-5 space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Nama Metode</label>
+                                    <input
+                                        type="text"
+                                        name="name"
+                                        value={paymentMethodForm.name}
+                                        onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, name: e.target.value })}
+                                        required
+                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Tipe</label>
+                                    <select
+                                        value={paymentMethodForm.type}
+                                        onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, type: e.target.value })}
+                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
+                                    >
+                                        <option value="bank_transfer">Transfer Bank</option>
+                                        <option value="qris">QRIS</option>
+                                        <option value="cash">Tunai (Cash)</option>
+                                        <option value="virtual_account">Virtual Account</option>
+                                    </select>
+                                </div>
+                                {paymentMethodForm.type === 'bank_transfer' && (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Bank</label>
+                                            <input type="text" name="bank_name" value={paymentMethodForm.bank_name} onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, bank_name: e.target.value })} className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">No. Rekening</label>
+                                            <input type="text" name="account_number" value={paymentMethodForm.account_number} onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, account_number: e.target.value })} className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500" />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nama Pemilik Rekening</label>
+                                            <input type="text" name="account_holder" value={paymentMethodForm.account_holder} onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, account_holder: e.target.value })} className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500" />
+                                        </div>
+                                    </div>
+                                )}
+                                {paymentMethodForm.type === 'virtual_account' && (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Bank</label>
+                                            <input type="text" name="bank_name" value={paymentMethodForm.bank_name} onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, bank_name: e.target.value })} className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">No. Rekening</label>
+                                            <input type="text" name="account_number" value={paymentMethodForm.account_number} onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, account_number: e.target.value })} className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500" />
+                                        </div>
+                                    </div>
+                                )}
+                                {paymentMethodForm.type === 'qris' && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">URL / Path Gambar QRIS Statis</label>
+                                        <input
+                                            type="text"
+                                            name="image_path"
+                                            value={paymentMethodForm.image_path}
+                                            onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, image_path: e.target.value })}
+                                            placeholder="/storage/images/qris.png atau https://..."
+                                            className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
+                                        />
+                                    </div>
+                                )}
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Deskripsi / Instruksi</label>
+                                    <textarea
+                                        name="description"
+                                        value={paymentMethodForm.description}
+                                        onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, description: e.target.value })}
+                                        rows={2}
+                                        placeholder="Instruksi tambahan untuk pelanggan"
+                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500 resize-none"
+                                    />
+                                </div>
+                            </div>
+                            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={closePaymentMethodModal}
+                                    className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold rounded-xl transition-colors"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={paymentMethodLoading}
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-colors"
+                                >
+                                    {paymentMethodLoading ? 'Menyimpan...' : (editingPaymentMethod ? 'Perbarui' : 'Simpan')}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             {/* Modal Preview Bukti Pembayaran */}
             {selectedProofUrl && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
@@ -1611,7 +2257,7 @@ const AdminDashboard: React.FC = () => {
                         <div className="p-6 flex flex-col items-center gap-4">
                             <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50 w-full max-h-[60vh] flex items-center justify-center">
                                 <img
-                                    src={selectedProofUrl.startsWith('http') ? selectedProofUrl : `http://localhost:8000/storage/${selectedProofUrl}`}
+                                    src={selectedProofUrl.startsWith('http') ? selectedProofUrl : `${getApiBaseUrl()}/storage/${selectedProofUrl}`}
                                     alt="Bukti Transfer / Pembayaran"
                                     className="object-contain max-h-[50vh]"
                                     onError={(e) => {

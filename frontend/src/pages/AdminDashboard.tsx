@@ -6,7 +6,7 @@ import {
     Clock, UserPlus, ArrowRightLeft, Truck,
     CheckCircle2, XCircle, AlertCircle, RefreshCw,
     ChevronDown, Search, Shield, TrendingUp, Banknote, Eye,
-    FileText, Globe, Plus, Trash2, Edit, MapPin, Printer, X
+    FileText, Globe, Plus, Trash2, Edit, MapPin, Printer
 } from 'lucide-react';
 import api, { getApiBaseUrl } from '../services/api';
 import { useCompany } from '../contexts/CompanyContext';
@@ -99,7 +99,6 @@ const AdminDashboard: React.FC = () => {
 
     // Payment Methods management states
     const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-    const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
     const [editingPaymentMethod, setEditingPaymentMethod] = useState<PaymentMethod | null>(null);
     const [paymentMethodForm, setPaymentMethodForm] = useState({
         name: '',

@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
     LayoutDashboard, Truck, History, CreditCard, Navigation, LogOut,
     Clock, DollarSign, AlertCircle, CheckCircle2, Upload, Eye, FileText, MapPin,
-    Printer, Download
+    Printer
 } from 'lucide-react';
 import api, { getApiBaseUrl } from '../services/api';
 import { useCompany } from '../contexts/CompanyContext';

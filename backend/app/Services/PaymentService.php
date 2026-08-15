@@ -65,14 +65,9 @@ class PaymentService
                 continue;
             }
 
-            $count = Payment::where('year', $year)
-                ->where('month', $month)
-                ->count() + 1;
-            $invoiceNumber = 'INV-' . $year . str_pad($month, 2, '0', STR_PAD_LEFT) . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
-
             $payment = Payment::create([
                 'customer_id' => $customer->id,
-                'invoice_number' => $invoiceNumber,
+                'invoice_number' => $this->generateInvoiceNumber($customer->id, $year, $month),
                 'amount' => $fee,
                 'month' => $month,
                 'year' => $year,
@@ -138,5 +133,31 @@ class PaymentService
         return Payment::where('customer_id', $customerId)
             ->latest()
             ->get();
+    }
+
+    /**
+     * Generate a unique invoice number for the given period.
+     */
+    public function generateInvoiceNumber(int $customerId, int $year, int $month): string
+    {
+        $count = Payment::where('year', $year)
+            ->where('month', $month)
+            ->count() + 1;
+
+        return 'INV-' . $year . str_pad((string) $month, 2, '0', STR_PAD_LEFT)
+            . '-' . str_pad((string) $count, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Company info used across invoices and the public site.
+     */
+    public function getCompanyInfo(): array
+    {
+        return [
+            'name' => (string) Setting::where('key', 'name')->value('value'),
+            'phone' => (string) Setting::where('key', 'phone')->value('value'),
+            'email' => (string) Setting::where('key', 'email')->value('value'),
+            'address' => (string) Setting::where('key', 'address')->value('value'),
+        ];
     }
 }

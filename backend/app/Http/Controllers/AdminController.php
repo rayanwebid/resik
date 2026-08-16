@@ -63,7 +63,7 @@ class AdminController extends Controller
     }
 
     /** Create a customer account from the admin panel. */
-    public function storeCustomer(Request $request): JsonResponse
+    public function storeCustomer(Request $request, PaymentService $paymentService): JsonResponse
     {
         $data = $request->validate([
             'name' => 'required|string|max:255',
@@ -92,11 +92,13 @@ class AdminController extends Controller
             ]);
         });
 
+        $this->generateCurrentBillingInvoices($paymentService);
+
         return response()->json(['success' => true, 'message' => 'Pelanggan berhasil ditambahkan.', 'data' => $customer->load('user')], 201);
     }
 
     /** Update customer profile and account details. */
-    public function updateCustomer(Request $request, Customer $customer): JsonResponse
+    public function updateCustomer(Request $request, Customer $customer, PaymentService $paymentService): JsonResponse
     {
         $data = $request->validate([
             'name' => 'required|string|max:255',
@@ -121,6 +123,10 @@ class AdminController extends Controller
             ]);
         });
 
+        // Generate immediately when the new due date has entered the H-7 window.
+        // The scheduled command remains as a daily fallback.
+        $this->generateCurrentBillingInvoices($paymentService);
+
         return response()->json(['success' => true, 'message' => 'Data pelanggan berhasil diperbarui.', 'data' => $customer->fresh()->load('user', 'latestMonthlyPayment')]);
     }
 
@@ -130,6 +136,17 @@ class AdminController extends Controller
         $name = $customer->user?->name ?? $customer->name;
         $customer->user?->delete();
         return response()->json(['success' => true, 'message' => "Pelanggan '{$name}' berhasil dihapus."]);
+    }
+
+    private function generateCurrentBillingInvoices(PaymentService $paymentService): void
+    {
+        $today = now();
+        $paymentService->generateMonthlyInvoices($today->month, $today->year);
+
+        // Also cover the next billing month when its H-7 window has already
+        // started (for example, a due date on the 1st of next month).
+        $nextMonth = $today->copy()->addMonthNoOverflow();
+        $paymentService->generateMonthlyInvoices($nextMonth->month, $nextMonth->year);
     }
 
     /**

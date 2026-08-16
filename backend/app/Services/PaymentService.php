@@ -52,7 +52,7 @@ class PaymentService
         foreach ($customers as $customer) {
             // Use customer's custom due day if set, otherwise default to last day of month
             if ($customer->payment_due_day) {
-                $customerDueDate = Carbon::create($year, $month, min($customer->payment_due_day, 28))->startOfDay();
+                $customerDueDate = Carbon::create($year, $month, min($customer->payment_due_day, $dueDate->daysInMonth))->startOfDay();
             } else {
                 $customerDueDate = $dueDate->copy();
             }

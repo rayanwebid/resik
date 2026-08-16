@@ -11,6 +11,8 @@ use App\Models\PaymentMethod;
 use App\Services\PaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class AdminController extends Controller
 {
@@ -58,6 +60,76 @@ class AdminController extends Controller
             'success' => true,
             'data' => Customer::with('user', 'latestMonthlyPayment')->get()
         ]);
+    }
+
+    /** Create a customer account from the admin panel. */
+    public function storeCustomer(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255|unique:users,email',
+            'password' => 'required|string|min:6|max:255',
+            'phone' => 'nullable|string|max:50',
+            'address' => 'nullable|string|max:1000',
+            'payment_due_day' => 'nullable|integer|min:1|max:31',
+        ]);
+
+        $customer = DB::transaction(function () use ($data) {
+            $role = \App\Models\Role::where('slug', 'pelanggan')->firstOrFail();
+            $user = User::create([
+                'role_id' => $role->id,
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'status' => 'active',
+            ]);
+            return $user->customer()->create([
+                'name' => $data['name'],
+                'phone' => $data['phone'] ?? '',
+                'address' => $data['address'] ?? '',
+                'customer_type' => 'rumah_tangga',
+                'payment_due_day' => $data['payment_due_day'] ?? null,
+            ]);
+        });
+
+        return response()->json(['success' => true, 'message' => 'Pelanggan berhasil ditambahkan.', 'data' => $customer->load('user')], 201);
+    }
+
+    /** Update customer profile and account details. */
+    public function updateCustomer(Request $request, Customer $customer): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255|unique:users,email,' . $customer->user_id,
+            'password' => 'nullable|string|min:6|max:255',
+            'phone' => 'nullable|string|max:50',
+            'address' => 'nullable|string|max:1000',
+            'payment_due_day' => 'nullable|integer|min:1|max:31',
+            'status' => 'nullable|in:active,pending,rejected,inactive',
+        ]);
+
+        DB::transaction(function () use ($data, $customer) {
+            $userData = ['name' => $data['name'], 'email' => $data['email']];
+            if (!empty($data['password'])) $userData['password'] = Hash::make($data['password']);
+            if (array_key_exists('status', $data)) $userData['status'] = $data['status'];
+            $customer->user()->update($userData);
+            $customer->update([
+                'name' => $data['name'],
+                'phone' => $data['phone'] ?? '',
+                'address' => $data['address'] ?? '',
+                'payment_due_day' => $data['payment_due_day'] ?? null,
+            ]);
+        });
+
+        return response()->json(['success' => true, 'message' => 'Data pelanggan berhasil diperbarui.', 'data' => $customer->fresh()->load('user', 'latestMonthlyPayment')]);
+    }
+
+    /** Delete customer account and its related customer records. */
+    public function destroyCustomer(Customer $customer): JsonResponse
+    {
+        $name = $customer->user?->name ?? $customer->name;
+        $customer->user?->delete();
+        return response()->json(['success' => true, 'message' => "Pelanggan '{$name}' berhasil dihapus."]);
     }
 
     /**

@@ -66,6 +66,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware(CheckRole::class . ':super-admin')->prefix('admin')->group(function () {
         Route::get('/dashboard', [AdminController::class, 'dashboard']);
         Route::get('/customers', [AdminController::class, 'customers']);
+        Route::post('/customers', [AdminController::class, 'storeCustomer']);
+        Route::put('/customers/{customer}', [AdminController::class, 'updateCustomer']);
+        Route::delete('/customers/{customer}', [AdminController::class, 'destroyCustomer']);
         Route::post('/customers/{user}/approve', [AdminController::class, 'approveCustomer']);
         Route::post('/customers/{user}/reject', [AdminController::class, 'rejectCustomer']);
         Route::put('/customers/{customer}/payment-due-day', [AdminController::class, 'updatePaymentDueDay']);

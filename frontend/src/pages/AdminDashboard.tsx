@@ -171,6 +171,15 @@ const AdminDashboard: React.FC = () => {
     const [updatingDueDayId, setUpdatingDueDayId] = useState<number | null>(null);
     const [dueDayCache, setDueDayCache] = useState<Record<number, number | undefined>>({});
 
+    // Customer CRUD (inline form, no popup)
+    const [customerFormOpen, setCustomerFormOpen] = useState(false);
+    const [editingCustomerId, setEditingCustomerId] = useState<number | null>(null);
+    const [customerFormLoading, setCustomerFormLoading] = useState(false);
+    const [customerFormError, setCustomerFormError] = useState<string | null>(null);
+    const [customerForm, setCustomerForm] = useState({
+        name: '', email: '', password: '', phone: '', address: '', payment_due_day: '', status: 'active'
+    });
+
     // New Officer form state
     const [officerForm, setOfficerForm] = useState({
         name: '', email: '', password: 'petugas123',
@@ -429,6 +438,61 @@ const AdminDashboard: React.FC = () => {
             alert(err.response?.data?.message || 'Gagal mengatur tanggal jatuh tempo.');
         } finally {
             setUpdatingDueDayId(null);
+        }
+    };
+
+    const resetCustomerForm = () => {
+        setCustomerForm({ name: '', email: '', password: '', phone: '', address: '', payment_due_day: '', status: 'active' });
+        setEditingCustomerId(null);
+        setCustomerFormError(null);
+    };
+
+    const startEditCustomer = (customer: any) => {
+        setEditingCustomerId(customer.id);
+        setCustomerForm({
+            name: customer.user?.name ?? customer.name ?? '',
+            email: customer.user?.email ?? customer.email ?? '',
+            password: '', phone: customer.phone ?? '', address: customer.address ?? '',
+            payment_due_day: customer.payment_due_day?.toString() ?? '',
+            status: customer.user?.status ?? customer.status ?? 'active',
+        });
+        setCustomerFormError(null);
+        setCustomerFormOpen(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleCustomerSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setCustomerFormLoading(true);
+        setCustomerFormError(null);
+        try {
+            const payload: any = { ...customerForm };
+            if (payload.payment_due_day) payload.payment_due_day = parseInt(payload.payment_due_day, 10);
+            else delete payload.payment_due_day;
+            if (editingCustomerId && !payload.password) delete payload.password;
+            const res = editingCustomerId
+                ? await api.put(`/admin/customers/${editingCustomerId}`, payload)
+                : await api.post('/admin/customers', payload);
+            if (res.data.success) {
+                resetCustomerForm();
+                setCustomerFormOpen(false);
+                await fetchData(false);
+            }
+        } catch (err: any) {
+            setCustomerFormError(err.response?.data?.message || Object.values(err.response?.data?.errors ?? {}).flat().join(' ') || 'Gagal menyimpan data pelanggan.');
+        } finally {
+            setCustomerFormLoading(false);
+        }
+    };
+
+    const handleDeleteCustomer = async (customer: any) => {
+        const name = customer.user?.name ?? customer.name ?? 'pelanggan ini';
+        if (!window.confirm(`Hapus pelanggan ${name}? Data tagihan dan riwayat terkait juga akan terhapus.`)) return;
+        try {
+            const res = await api.delete(`/admin/customers/${customer.id}`);
+            if (res.data.success) fetchData(false);
+        } catch (err: any) {
+            alert(err.response?.data?.message || 'Gagal menghapus pelanggan.');
         }
     };
 
@@ -910,7 +974,39 @@ const AdminDashboard: React.FC = () => {
                                 <span className="text-xs text-slate-500 bg-white border border-slate-200 px-3 py-2 rounded-xl">
                                     {filteredCustomers.length} pelanggan
                                 </span>
+                                <button
+                                    onClick={() => { if (customerFormOpen) { resetCustomerForm(); } setCustomerFormOpen(!customerFormOpen); }}
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-2"
+                                >
+                                    <Plus className="h-4 w-4" /> {customerFormOpen ? 'Tutup Form' : 'Tambah Pelanggan'}
+                                </button>
                             </div>
+
+                            {customerFormOpen && (
+                                <form onSubmit={handleCustomerSubmit} className="bg-white rounded-2xl border border-emerald-200 shadow-sm p-5 space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h3 className="font-bold text-slate-800">{editingCustomerId ? 'Edit Data Pelanggan' : 'Tambah Pelanggan Baru'}</h3>
+                                            <p className="text-xs text-slate-500">Form tampil di halaman ini, tanpa popup.</p>
+                                        </div>
+                                        {editingCustomerId && <span className="text-xs text-amber-600 font-semibold">Mode edit</span>}
+                                    </div>
+                                    {customerFormError && <div className="p-3 bg-red-50 text-red-600 rounded-xl text-xs">{customerFormError}</div>}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        <input required placeholder="Nama lengkap" value={customerForm.name} onChange={e => setCustomerForm({ ...customerForm, name: e.target.value })} className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
+                                        <input required type="email" placeholder="Email login" value={customerForm.email} onChange={e => setCustomerForm({ ...customerForm, email: e.target.value })} className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
+                                        <input required={!editingCustomerId} type="password" placeholder={editingCustomerId ? 'Password baru (opsional)' : 'Password minimal 6 karakter'} value={customerForm.password} onChange={e => setCustomerForm({ ...customerForm, password: e.target.value })} className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
+                                        <input placeholder="Nomor HP" value={customerForm.phone} onChange={e => setCustomerForm({ ...customerForm, phone: e.target.value })} className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
+                                        <input type="number" min="1" max="31" placeholder="Tanggal jatuh tempo (1-31)" value={customerForm.payment_due_day} onChange={e => setCustomerForm({ ...customerForm, payment_due_day: e.target.value })} className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
+                                        {editingCustomerId && <select value={customerForm.status} onChange={e => setCustomerForm({ ...customerForm, status: e.target.value })} className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm"><option value="active">Aktif</option><option value="pending">Pending</option><option value="inactive">Nonaktif</option><option value="rejected">Ditolak</option></select>}
+                                        <textarea placeholder="Alamat lengkap" value={customerForm.address} onChange={e => setCustomerForm({ ...customerForm, address: e.target.value })} className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm md:col-span-2 lg:col-span-3" rows={2} />
+                                    </div>
+                                    <div className="flex justify-end gap-2">
+                                        <button type="button" onClick={() => { resetCustomerForm(); setCustomerFormOpen(false); }} className="px-4 py-2 border border-slate-200 text-slate-600 text-xs font-bold rounded-xl">Batal</button>
+                                        <button disabled={customerFormLoading} className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl disabled:opacity-50">{customerFormLoading ? 'Menyimpan...' : (editingCustomerId ? 'Simpan Perubahan' : 'Simpan Pelanggan')}</button>
+                                    </div>
+                                </form>
+                            )}
 
                             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
                                 <div className="overflow-x-auto">
@@ -991,7 +1087,19 @@ const AdminDashboard: React.FC = () => {
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <div className="flex items-center gap-1.5">
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <button
+                                                                onClick={() => startEditCustomer(c)}
+                                                                className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                                                            >
+                                                                <Edit className="h-3.5 w-3.5" /> Edit
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteCustomer(c)}
+                                                                className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                                                            >
+                                                                <Trash2 className="h-3.5 w-3.5" /> Hapus
+                                                            </button>
                                                             {(isPendingReg || isRejectedReg) ? (
                                                                 <>
                                                                     <button

@@ -40,12 +40,7 @@ class PaymentService
         $generated = [];
 
         $dueDate = Carbon::create($year, $month, 1)->lastOfMonth();
-        $invoiceDate = $dueDate->copy()->subDays($this->getInvoiceDaysBefore());
         $today = Carbon::now();
-
-        if ($today->lt($invoiceDate)) {
-            return $generated;
-        }
 
         $fee = $this->getSubscriptionFee();
 
@@ -55,6 +50,20 @@ class PaymentService
         })->get();
 
         foreach ($customers as $customer) {
+            // Use customer's custom due day if set, otherwise default to last day of month
+            if ($customer->payment_due_day) {
+                $customerDueDate = Carbon::create($year, $month, min($customer->payment_due_day, 28))->startOfDay();
+            } else {
+                $customerDueDate = $dueDate->copy();
+            }
+
+            $invoiceDate = $customerDueDate->copy()->subDays($this->getInvoiceDaysBefore());
+
+            // Skip if we haven't reached the billing window yet
+            if ($today->lt($invoiceDate)) {
+                continue;
+            }
+
             // Skip if invoice already exists for this period
             $exists = Payment::where('customer_id', $customer->id)
                 ->where('month', $month)
@@ -68,6 +77,7 @@ class PaymentService
             $payment = Payment::create([
                 'customer_id' => $customer->id,
                 'invoice_number' => $this->generateInvoiceNumber($customer->id, $year, $month),
+                'type' => 'bulanan',
                 'amount' => $fee,
                 'month' => $month,
                 'year' => $year,
@@ -75,7 +85,7 @@ class PaymentService
                 'payment_method' => null,
                 'proof_path' => null,
                 'payment_date' => null,
-                'due_date' => $dueDate->toDateString(),
+                'due_date' => $customerDueDate->toDateString(),
                 'invoice_date' => $invoiceDate->toDateString(),
                 'paid_at' => null,
             ]);

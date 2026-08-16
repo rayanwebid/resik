@@ -21,6 +21,19 @@ const typeLabel = (type: string): string => {
     return map[type] || type;
 };
 
+const openInvoiceInWindow = async (relativeUrl: string) => {
+    try {
+        const res = await api.get(relativeUrl, { responseType: 'text' });
+        const newWin = window.open('', '_blank', 'width=820,height=900,scrollbars=yes');
+        if (newWin) {
+            newWin.document.write(res.data);
+            newWin.document.close();
+        }
+    } catch (err) {
+        console.error('Gagal membuka invoice:', err);
+    }
+};
+
 const CustomerDashboard: React.FC = () => {
     const { user, logout } = useAuth();
     const { company } = useCompany();
@@ -422,8 +435,28 @@ const CustomerDashboard: React.FC = () => {
                                 {data.latest_bill ? (
                                     <div className="p-4 bg-slate-50 rounded-xl space-y-3">
                                         <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-400">Tanggal Tagihan:</span>
+                                            <span className="font-bold text-gray-800">{data.latest_bill.invoice_date ? new Date(data.latest_bill.invoice_date).toLocaleDateString('id-ID', {
+                                                year: 'numeric',
+                                                month: 'short',
+                                                day: 'numeric',
+                                            }) : '-'}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-400">Jatuh Tempo:</span>
+                                            <span className="font-bold text-gray-800">{data.latest_bill.due_date ? new Date(data.latest_bill.due_date).toLocaleDateString('id-ID', {
+                                                year: 'numeric',
+                                                month: 'short',
+                                                day: 'numeric',
+                                            }) : '-'}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
                                             <span className="text-slate-400">Periode Tagihan:</span>
                                             <span className="font-bold text-gray-800">Bulan {data.latest_bill.month} / {data.latest_bill.year}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-400">Jenis:</span>
+                                            <span className="font-bold text-gray-800 capitalize">{data.latest_bill.type === 'bulanan' ? 'Bulanan' : 'Insidental'}</span>
                                         </div>
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-slate-400">Nominal Pembayaran:</span>
@@ -718,9 +751,11 @@ const CustomerDashboard: React.FC = () => {
                                 <div className="overflow-x-auto">
                                     <table className="w-full min-w-[800px] divide-y divide-gray-150">
                                     <thead className="bg-slate-50">
-                                        <tr>
+                                    <tr>
+                                            <th className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tanggal Tagihan</th>
                                             <th className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Periode Bulan</th>
                                             <th className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tagihan (Rp)</th>
+                                            <th className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Jenis</th>
                                             <th className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                                             <th className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Aksi</th>
                                         </tr>
@@ -729,8 +764,18 @@ const CustomerDashboard: React.FC = () => {
                                         {payments.length > 0 ? (
                                             payments.map(pay => (
                                                 <tr key={pay.id} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="px-6 py-4 whitespace-nowrap text-slate-500 text-xs">
+                                                        {pay.invoice_date ? new Date(pay.invoice_date).toLocaleDateString('id-ID', {
+                                                            year: 'numeric',
+                                                            month: 'short',
+                                                            day: 'numeric',
+                                                        }) : '-'}
+                                                    </td>
                                                     <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-950">Bulan {pay.month} / {pay.year}</td>
                                                     <td className="px-6 py-4 whitespace-nowrap font-bold text-gray-900">Rp {parseInt(pay.amount as any).toLocaleString('id-ID')}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap capitalize text-xs text-slate-500">
+                                                        {pay.type === 'bulanan' ? 'Bulanan' : 'Insidental'}
+                                                    </td>
                                                     <td className="px-6 py-4 whitespace-nowrap">
                                                         <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase ${pay.status === 'Paid' ? 'bg-emerald-100 text-emerald-800' : pay.status === 'Pending' ? 'bg-slate-100 text-slate-700' : 'bg-red-100 text-red-800'}`}>
                                                             {pay.status}
@@ -759,7 +804,7 @@ const CustomerDashboard: React.FC = () => {
                                             ))
                                         ) : (
                                             <tr>
-                                                <td colSpan={4} className="px-6 py-10 text-center text-gray-400 italic">Belum ada daftar tagihan iuran langganan saat ini.</td>
+                                                <td colSpan={5} className="px-6 py-10 text-center text-gray-400 italic">Belum ada daftar tagihan iuran langganan saat ini.</td>
                                             </tr>
                                         )}
                                     </tbody>
@@ -1009,6 +1054,21 @@ const CustomerDashboard: React.FC = () => {
                             <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Periode Tagihan</p>
                                 <p className="font-bold text-slate-800 text-base mt-0.5">Bulan {selectedInvoice.month} / {selectedInvoice.year}</p>
+                                {selectedInvoice.invoice_date && (
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        Tgl Tagihan: {new Date(selectedInvoice.invoice_date).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                    </p>
+                                )}
+                                {selectedInvoice.due_date && (
+                                    <p className="text-xs text-slate-500">
+                                        Jatuh Tempo: {new Date(selectedInvoice.due_date).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                    </p>
+                                )}
+                                {selectedInvoice.type && (
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        Tipe: <span className="font-semibold capitalize">{selectedInvoice.type}</span>
+                                    </p>
+                                )}
                                 <p className="text-3xl font-black text-rose-600 mt-2">
                                     Rp {Number(selectedInvoice.amount).toLocaleString('id-ID')}
                                 </p>
@@ -1078,15 +1138,13 @@ const CustomerDashboard: React.FC = () => {
                             </div>
                         </div>
                         <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
-                            {(selectedInvoice.status === 'Paid') && (
-                                <button
-                                    onClick={() => window.open(`${getApiBaseUrl()}/api/customer/payments/${selectedInvoice.id}/invoice?download=1`, '_blank')}
-                                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-650 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
-                                >
-                                    <Printer className="h-3.5 w-3.5" />
-                                    Print / Save PDF
-                                </button>
-                            )}
+                            <button
+                                onClick={() => openInvoiceInWindow(`/customer/payments/${selectedInvoice.id}/invoice?download=1`)}
+                                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-650 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                            >
+                                <Printer className="h-3.5 w-3.5" />
+                                Print / Save PDF
+                            </button>
                             <button
                                 onClick={() => setSelectedInvoice(null)}
                                 className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold rounded-xl transition-colors"

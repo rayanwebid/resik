@@ -56,7 +56,7 @@ class AdminController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data' => Customer::with('user')->get()
+            'data' => Customer::with('user', 'latestMonthlyPayment')->get()
         ]);
     }
 
@@ -67,9 +67,34 @@ class AdminController extends Controller
     {
         $user->update(['status' => 'active']);
 
+        // Optionally set a default payment_due_day if provided
+        if ($user->customer && $request->has('payment_due_day')) {
+            $user->customer->update(['payment_due_day' => $request->payment_due_day]);
+        }
+
         return response()->json([
             'success' => true,
             'message' => "Registrasi pelanggan '{$user->name}' telah berhasil disetujui."
+        ]);
+    }
+
+    /**
+     * Update customer payment due day
+     */
+    public function updatePaymentDueDay(Request $request, Customer $customer): JsonResponse
+    {
+        $request->validate([
+            'payment_due_day' => 'required|integer|min:1|max:31',
+        ]);
+
+        $customer->update([
+            'payment_due_day' => $request->payment_due_day,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Tanggal jatuh tempo pembayaran bulanan berhasil diperbarui.',
+            'data' => $customer->fresh()
         ]);
     }
 

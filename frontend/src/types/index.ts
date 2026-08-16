@@ -59,6 +59,7 @@ export interface Customer {
     longitude?: number;
     house_photo?: string;
     customer_type: 'rumah_tangga' | 'komersial' | 'organik' | 'anorganik';
+    payment_due_day?: number | null;
     user?: User;
 }
 
@@ -115,6 +116,7 @@ export interface Payment {
     month: number;
     year: number;
     status: 'Unpaid' | 'Paid' | 'Failed' | 'Cancelled' | 'Jatuh Tempo' | 'Pending';
+    type?: 'bulanan' | 'insidental';
     payment_method?: string;
     proof_path?: string;
     payment_date?: string;

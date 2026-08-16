@@ -17,7 +17,7 @@ class InvoiceController extends Controller
         $user = Auth::user();
 
         // Authorization: pelanggan hanya boleh melihat invoice miliknya.
-        if ($user->role === 'pelanggan') {
+        if ($user->hasRole('pelanggan')) {
             $customer = $user->customer;
             if (!$customer || $payment->customer_id !== $customer->id) {
                 return response()->json(['success' => false, 'message' => 'Data tidak ditemukan.'], 404);
@@ -69,9 +69,10 @@ class InvoiceController extends Controller
             ? \Carbon\Carbon::parse($payment->invoice_date)->format('d M Y')
             : '-';
 
-        $monthName = \Carbon\Carbon::createFromDate($payment->year, $payment->month)->format('F Y');
+         $monthName = \Carbon\Carbon::createFromDate($payment->year, $payment->month)->format('F Y');
         $amountFormatted = number_format((float) $payment->amount, 0, ',', '.');
         $methodLabel = self::typeLabel($payment->payment_method);
+        $typeLabel = $payment->type === 'insidental' ? 'Insidental' : 'Bulanan';
 
         $bankDetails = '';
         $qrisImage = '';
@@ -165,7 +166,7 @@ class InvoiceController extends Controller
             <tr>
                 <td>Iuran Bulanan Service Pengelolaan Sampah</td>
                 <td>{$monthName}</td>
-                <td>{$methodLabel} {$bankDetails}</td>
+                <td>{$typeLabel} • {$methodLabel} {$bankDetails}</td>
                 <td class="amount">Rp {$amountFormatted}</td>
             </tr>
         </tbody>

@@ -20,6 +20,7 @@ class Customer extends Model
         'longitude',
         'house_photo',
         'customer_type',
+        'payment_due_day',
     ];
 
     public function user()
@@ -55,5 +56,15 @@ class Customer extends Model
     public function payments()
     {
         return $this->hasMany(Payment::class);
+    }
+
+    public function latestPayment()
+    {
+        return $this->hasOne(Payment::class)->latest('id');
+    }
+
+    public function latestMonthlyPayment()
+    {
+        return $this->hasOne(Payment::class)->where('type', 'bulanan')->latest('id');
     }
 }

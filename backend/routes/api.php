@@ -68,6 +68,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/customers', [AdminController::class, 'customers']);
         Route::post('/customers/{user}/approve', [AdminController::class, 'approveCustomer']);
         Route::post('/customers/{user}/reject', [AdminController::class, 'rejectCustomer']);
+        Route::put('/customers/{customer}/payment-due-day', [AdminController::class, 'updatePaymentDueDay']);
         Route::get('/officers', [AdminController::class, 'officers']);
         Route::post('/officers', [AdminController::class, 'storeOfficer']);
         Route::post('/officers/{officer}/toggle', [AdminController::class, 'toggleOfficer']);

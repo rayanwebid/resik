@@ -55,6 +55,39 @@ const typeLabel = (type: string): string => {
     return map[type] || type;
 };
 
+const formatDate = (dateStr: string | undefined | null): string => {
+    if (!dateStr) return '-';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('id-ID', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+    });
+};
+
+const openInvoiceInWindow = async (relativeUrl: string) => {
+    try {
+        const res = await api.get(relativeUrl, { responseType: 'text' });
+        const newWin = window.open('', '_blank', 'width=820,height=900,scrollbars=yes');
+        if (newWin) {
+            newWin.document.write(res.data);
+            newWin.document.close();
+        }
+    } catch (err) {
+        console.error('Gagal membuka invoice:', err);
+    }
+};
+
+const paymentStatusLabel: Record<string, string> = {
+    Paid: 'Lunas',
+    Unpaid: 'Belum Bayar',
+    Pending: 'Menunggu Verifikasi',
+    Failed: 'Gagal',
+    Cancelled: 'Dibatalkan',
+    'Jatuh Tempo': 'Lewat Jatuh Tempo',
+};
+
 const AdminDashboard: React.FC = () => {
     const { user, logout } = useAuth();
     const { company, refreshCompany } = useCompany();
@@ -126,13 +159,17 @@ const AdminDashboard: React.FC = () => {
     const [settingsLogo, setSettingsLogo] = useState<File | null>(null);
     const [settingsFavicon, setSettingsFavicon] = useState<File | null>(null);
 
-    // Selected items for Details/Preview Modal
+     // Selected items for Details/Preview Modal
     const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
     const [selectedProofUrl, setSelectedProofUrl] = useState<string | null>(null);
 
     // Search states
     const [searchCustomer, setSearchCustomer] = useState('');
     const [searchPayment, setSearchPayment] = useState('');
+
+    // Payment due day editing
+    const [updatingDueDayId, setUpdatingDueDayId] = useState<number | null>(null);
+    const [dueDayCache, setDueDayCache] = useState<Record<number, number | undefined>>({});
 
     // New Officer form state
     const [officerForm, setOfficerForm] = useState({
@@ -376,6 +413,23 @@ const AdminDashboard: React.FC = () => {
             const res = await api.post(`/admin/customers/${userId}/reject`);
             if (res.data.success) fetchData(true);
         } catch (err) { console.error(err); }
+    };
+
+    const handleUpdatePaymentDueDay = async (customerId: number, dueDay: number) => {
+        setUpdatingDueDayId(customerId);
+        try {
+            const res = await api.put(`/admin/customers/${customerId}/payment-due-day`, {
+                payment_due_day: dueDay,
+            });
+            if (res.data.success) {
+                fetchData(false);
+            }
+        } catch (err: any) {
+            console.error(err);
+            alert(err.response?.data?.message || 'Gagal mengatur tanggal jatuh tempo.');
+        } finally {
+            setUpdatingDueDayId(null);
+        }
     };
 
     const handleToggleOfficer = async (officerId: number) => {
@@ -862,15 +916,20 @@ const AdminDashboard: React.FC = () => {
                                 <div className="overflow-x-auto">
                                     <table className="w-full min-w-[800px] divide-y divide-slate-100">
                                     <thead className="bg-slate-50">
-                                        <tr>
-                                            {['Pelanggan', 'NIK', 'Alamat', 'Status', 'Aksi'].map(h => (
+                                         <tr>
+                                            {['Pelanggan', 'NIK', 'Alamat', 'Tgl Jatuh Tempo', 'Tanggal Tagihan', 'Status', 'Aksi'].map(h => (
                                                 <th key={h} className="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">{h}</th>
                                             ))}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 text-sm">
-                                        {filteredCustomers.length > 0 ? filteredCustomers.map((c: any) => {
+                                         {filteredCustomers.length > 0 ? filteredCustomers.map((c: any) => {
                                             const cust = c.user ? c : { user: c, nik: c.nik, address: c.address };
+                                            const payment = c.latestMonthlyPayment;
+                                            const isPendingReg = (cust.user?.status ?? c.status ?? 'pending') === 'pending';
+                                            const isRejectedReg = (cust.user?.status ?? c.status ?? 'rejected') === 'rejected';
+                                            const isPaid = payment?.status === 'Paid';
+                                            const isPendingPayment = payment?.status === 'Pending';
                                             return (
                                                 <tr key={c.id} className="hover:bg-slate-50 transition-colors">
                                                     <td className="px-6 py-4">
@@ -887,39 +946,113 @@ const AdminDashboard: React.FC = () => {
                                                     <td className="px-6 py-4 text-slate-600 font-mono text-xs">{cust.nik ?? '-'}</td>
                                                     <td className="px-6 py-4 text-slate-500 max-w-xs truncate">{cust.address ?? '-'}</td>
                                                     <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                max="31"
+                                                                value={dueDayCache[c.id] ?? (c.payment_due_day ?? '')}
+                                                                onChange={(e) => setDueDayCache({ ...dueDayCache, [c.id]: parseInt(e.target.value) || undefined })}
+                                                                onBlur={() => {
+                                                                    const val = dueDayCache[c.id] ?? c.payment_due_day;
+                                                                    if (val && val !== (c.payment_due_day ?? undefined)) {
+                                                                        handleUpdatePaymentDueDay(c.id, val);
+                                                                    } else {
+                                                                        setDueDayCache(prev => {
+                                                                            const next = { ...prev };
+                                                                            delete next[c.id];
+                                                                            return next;
+                                                                        });
+                                                                    }
+                                                                }}
+                                                                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                                                                disabled={updatingDueDayId === c.id}
+                                                                className="w-14 px-2 py-1 text-xs border border-slate-200 rounded-lg text-center focus:outline-none focus:border-emerald-500 disabled:opacity-50"
+                                                                placeholder="31"
+                                                            />
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        {payment ? (
+                                                            <div className="text-xs">
+                                                                <p className="font-semibold text-slate-800">{formatDate(payment.invoice_date || payment.due_date)}</p>
+                                                                <p className="text-slate-400">Jatuh tempo: {formatDate(payment.due_date)}</p>
+                                                                <span className={statusBadge(payment.status)}>
+                                                                    {paymentStatusLabel[payment.status] ?? payment.status}
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-slate-400 italic text-xs">Belum ada tagihan</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4">
                                                         <span className={statusBadge(cust.user?.status ?? c.status ?? 'pending')}>
                                                             {cust.user?.status ?? c.status ?? 'pending'}
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center gap-1.5">
-                                                            <button
-                                                                onClick={() => setSelectedCustomer(c)}
-                                                                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
-                                                            >
-                                                                <Eye className="h-3.5 w-3.5" />
-                                                                Detail
-                                                            </button>
-                                                            {(cust.user?.status === 'pending' || c.status === 'pending') ? (
+                                                            {(isPendingReg || isRejectedReg) ? (
                                                                 <>
                                                                     <button
-                                                                        onClick={() => handleApproveCustomer(cust.user?.id ?? c.id)}
-                                                                        className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                                                                        onClick={() => setSelectedCustomer(c)}
+                                                                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
                                                                     >
-                                                                        <CheckCircle2 className="h-3.5 w-3.5" />
-                                                                        Setujui
+                                                                        <Eye className="h-3.5 w-3.5" />
+                                                                        Detail
                                                                     </button>
-                                                                    <button
-                                                                        onClick={() => handleRejectCustomer(cust.user?.id ?? c.id)}
-                                                                        className="px-2.5 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
-                                                                    >
-                                                                        Tolak
-                                                                    </button>
+                                                                    {isPendingReg && (
+                                                                        <>
+                                                                            <button
+                                                                                onClick={() => handleApproveCustomer(cust.user?.id ?? c.id)}
+                                                                                className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                                                                            >
+                                                                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                                                                Setujui
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleRejectCustomer(cust.user?.id ?? c.id)}
+                                                                                className="px-2.5 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                                                                            >
+                                                                                Tolak
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                    {isRejectedReg && (
+                                                                        <span className="text-xs text-red-500 font-semibold italic">Ditolak</span>
+                                                                    )}
                                                                 </>
-                                                            ) : cust.user?.status === 'rejected' || c.status === 'rejected' ? (
-                                                                <span className="text-xs text-red-500 font-semibold italic">Ditolak</span>
                                                             ) : (
-                                                                <span className="text-xs text-slate-400 italic">Aktif</span>
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => setSelectedCustomer(c)}
+                                                                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                                                                    >
+                                                                        <Eye className="h-3.5 w-3.5" />
+                                                                        Detail
+                                                                    </button>
+                                                                    {isPendingPayment && (
+                                                                        <button
+                                                                            onClick={() => handlePaymentAction(payment.id, 'approve')}
+                                                                            className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                                                                        >
+                                                                            <CheckCircle2 className="h-3.5 w-3.5" />
+                                                                            Setujui Bayar
+                                                                        </button>
+                                                                    )}
+                                                                    {payment && (
+                                                                        <button
+                                                                            onClick={() => openInvoiceInWindow(`/admin/payments/${payment.id}/invoice?download=1`)}
+                                                                            className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-650 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                                                                        >
+                                                                            <Printer className="h-3.5 w-3.5" />
+                                                                            Cetak PDF
+                                                                        </button>
+                                                                    )}
+                                                                    {!isPendingPayment && !isPaid && (
+                                                                        <span className="text-xs text-slate-400 italic">Aktif</span>
+                                                                    )}
+                                                                </>
                                                             )}
                                                         </div>
                                                     </td>
@@ -927,7 +1060,7 @@ const AdminDashboard: React.FC = () => {
                                             );
                                         }) : (
                                             <tr>
-                                                <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">
+                                                <td colSpan={7} className="px-6 py-12 text-center text-slate-400 italic">
                                                     Tidak ada data pelanggan yang ditemukan.
                                                 </td>
                                             </tr>
@@ -1459,7 +1592,7 @@ const AdminDashboard: React.FC = () => {
                                                         </button>
                                                     ) : (
                                                         <button
-                                                            onClick={() => window.open(`${getApiBaseUrl()}/api/admin/payments/${pay.id}/invoice?download=1`, '_blank')}
+                                                            onClick={() => openInvoiceInWindow(`/admin/payments/${pay.id}/invoice?download=1`)}
                                                             className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-650 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
                                                         >
                                                             <Printer className="h-3.5 w-3.5" />
@@ -2059,6 +2192,31 @@ const AdminDashboard: React.FC = () => {
                                 <div className="col-span-2">
                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Alamat Lengkap</p>
                                     <p className="font-medium text-slate-700 mt-0.5">{selectedCustomer.address ?? '-'}</p>
+                                </div>
+                                <div className="col-span-2">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tanggal Jatuh Tempo Bulanan</p>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max="31"
+                                            value={dueDayCache[selectedCustomer.id] ?? (selectedCustomer.payment_due_day ?? '')}
+                                            onChange={(e) => setDueDayCache({ ...dueDayCache, [selectedCustomer.id]: parseInt(e.target.value) || undefined })}
+                                            onBlur={() => {
+                                                const val = dueDayCache[selectedCustomer.id] ?? selectedCustomer.payment_due_day;
+                                                if (val && val !== (selectedCustomer.payment_due_day ?? undefined)) {
+                                                    handleUpdatePaymentDueDay(selectedCustomer.id, val);
+                                                }
+                                            }}
+                                            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                                            disabled={updatingDueDayId === selectedCustomer.id}
+                                            className="w-16 px-2 py-1 text-xs border border-slate-200 rounded-lg text-center focus:outline-none focus:border-emerald-500 disabled:opacity-50"
+                                            placeholder="31"
+                                        />
+                                        <span className="text-xs text-slate-400">
+                                            {selectedCustomer.payment_due_day ? `Setiap tanggal ${selectedCustomer.payment_due_day} setiap bulumnya` : 'Belum diatur (default: akhir bulan)'}
+                                        </span>
+                                    </div>
                                 </div>
                                 {selectedCustomer.latitude && selectedCustomer.longitude && (
                                     <div className="col-span-2">

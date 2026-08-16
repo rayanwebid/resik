@@ -11,6 +11,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      filename: 'sw-v2.js',
       devOptions: {
         enabled: true
       },

@@ -69,6 +69,7 @@ const CustomerDashboard: React.FC = () => {
     const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
     const [paymentMethod, setPaymentMethod] = useState('');
     const [proofUrl, setProofUrl] = useState('');
+    const [proofFile, setProofFile] = useState<File | null>(null);
     const [proofPreviewUrl, setProofPreviewUrl] = useState<string | null>(null);
     const [payLoading, setPayLoading] = useState(false);
     const [paySuccess, setPaySuccess] = useState(false);
@@ -192,15 +193,21 @@ const CustomerDashboard: React.FC = () => {
         const isCash = paymentMethod === 'cash';
 
         try {
-            const res = await api.post(`/customer/payments/${selectedPayment.id}/pay`, {
-                payment_method: paymentMethod,
-                proof_path: isCash ? null : (proofUrl || '')
+            const formData = new FormData();
+            formData.append('payment_method', paymentMethod);
+            if (!isCash && proofFile) formData.append('proof', proofFile);
+            // Keep the old data-url fallback for already-open older clients.
+            if (!isCash && !proofFile && proofUrl.startsWith('data:image/')) formData.append('proof_path', proofUrl);
+
+            const res = await api.post(`/customer/payments/${selectedPayment.id}/pay`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
             });
 
             if (res.data.success) {
                 setPaySuccess(true);
                 setSelectedPayment(null);
                 setProofUrl('');
+                setProofFile(null);
                 setProofPreviewUrl(null);
                 fetchData();
                 setTimeout(() => setPaySuccess(false), 4000);
@@ -827,7 +834,7 @@ const CustomerDashboard: React.FC = () => {
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Pilih Metode Pembayaran</label>
                                             <select
                                                 value={paymentMethod}
-                                                onChange={(e) => { setPaymentMethod(e.target.value); setProofPreviewUrl(null); setProofUrl(''); }}
+                                                onChange={(e) => { setPaymentMethod(e.target.value); setProofPreviewUrl(null); setProofUrl(''); setProofFile(null); }}
                                                 className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
                                             >
                                                 {paymentMethods.length > 0 ? paymentMethods.map((m) => (
@@ -885,6 +892,7 @@ const CustomerDashboard: React.FC = () => {
                                                             onClick={() => {
                                                                 setProofPreviewUrl(null);
                                                                 setProofUrl('');
+                                                                setProofFile(null);
                                                             }}
                                                             className="px-2.5 py-1.5 bg-red-650 hover:bg-red-750 text-white rounded-lg text-xs font-bold transition-colors"
                                                         >
@@ -903,8 +911,8 @@ const CustomerDashboard: React.FC = () => {
                                                                 const reader = new FileReader();
                                                                 reader.onloadend = () => {
                                                                     setProofPreviewUrl(reader.result as string);
-                                                                    // Kirim isi gambar sebagai data URL agar backend dapat menyimpannya.
-                                                                    setProofUrl(reader.result as string);
+                                                                    setProofFile(file);
+                                                                    setProofUrl('');
                                                                 };
                                                                 reader.readAsDataURL(file);
                                                             }

@@ -2525,9 +2525,6 @@ const AdminDashboard: React.FC = () => {
                                     src={selectedProofUrl.startsWith('http') ? selectedProofUrl : `${getApiBaseUrl()}/storage/${selectedProofUrl}`}
                                     alt="Bukti Transfer / Pembayaran"
                                     className="object-contain max-h-[50vh]"
-                                    onError={(e) => {
-                                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1628157582853-a796fa650a6a?auto=format&fit=crop&w=500&q=80';
-                                    }}
                                 />
                             </div>
                         </div>

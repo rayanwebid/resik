@@ -128,10 +128,25 @@ class CustomerController extends Controller
 
         $request->validate([
             'payment_method' => 'required|string|in:' . implode(',', $paymentMethodNames),
+            'proof' => 'nullable|file|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'proof_path' => 'nullable|string|max:3000000',
         ]);
 
         $proofPath = $request->payment_method === 'cash' ? null : $request->proof_path;
+
+        if ($request->payment_method !== 'cash' && $request->hasFile('proof')) {
+            $proofPath = $request->file('proof')->store('payments', 'public');
+        }
+
+        if ($request->payment_method !== 'cash' && $proofPath
+            && !Str::startsWith($proofPath, 'data:image/')
+            && !filter_var($proofPath, FILTER_VALIDATE_URL)
+            && !Storage::disk('public')->exists($proofPath)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Bukti pembayaran belum terkirim sebagai file. Silakan muat ulang halaman lalu pilih foto kembali.',
+            ], 422);
+        }
 
         // The web client sends the selected image as a data URL. Persist it on
         // the public disk instead of storing only the local filename.

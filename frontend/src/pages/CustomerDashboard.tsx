@@ -903,7 +903,8 @@ const CustomerDashboard: React.FC = () => {
                                                                 const reader = new FileReader();
                                                                 reader.onloadend = () => {
                                                                     setProofPreviewUrl(reader.result as string);
-                                                                    setProofUrl(file.name);
+                                                                    // Kirim isi gambar sebagai data URL agar backend dapat menyimpannya.
+                                                                    setProofUrl(reader.result as string);
                                                                 };
                                                                 reader.readAsDataURL(file);
                                                             }

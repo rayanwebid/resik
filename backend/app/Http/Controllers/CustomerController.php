@@ -8,6 +8,8 @@ use App\Services\PaymentService;
 use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class CustomerController extends Controller
 {
@@ -117,16 +119,45 @@ class CustomerController extends Controller
      */
     public function pay(Request $request, Payment $payment): JsonResponse
     {
+        $customer = $request->user()->customer;
+        if (!$customer || $payment->customer_id !== $customer->id) {
+            return response()->json(['success' => false, 'message' => 'Pembayaran tidak ditemukan.'], 404);
+        }
+
         $paymentMethodNames = $this->paymentService->getActivePaymentMethods()->pluck('type')->toArray();
 
         $request->validate([
             'payment_method' => 'required|string|in:' . implode(',', $paymentMethodNames),
-            'proof_path' => 'nullable|string',
+            'proof_path' => 'nullable|string|max:3000000',
         ]);
+
+        $proofPath = $request->payment_method === 'cash' ? null : $request->proof_path;
+
+        // The web client sends the selected image as a data URL. Persist it on
+        // the public disk instead of storing only the local filename.
+        if ($proofPath && Str::startsWith($proofPath, 'data:image/')) {
+            if (!preg_match('/^data:image\/(jpeg|png|jpg|gif|webp);base64,(.+)$/s', $proofPath, $matches)) {
+                return response()->json(['success' => false, 'message' => 'Format bukti pembayaran tidak valid.'], 422);
+            }
+
+            $decoded = base64_decode($matches[2], true);
+            if ($decoded === false || strlen($decoded) > 2 * 1024 * 1024) {
+                return response()->json(['success' => false, 'message' => 'Ukuran bukti pembayaran maksimal 2MB.'], 422);
+            }
+
+            $extension = $matches[1] === 'jpg' ? 'jpeg' : $matches[1];
+            $proofPath = Storage::disk('public')->put(
+                'payments/' . Str::uuid() . '.' . $extension,
+                $decoded
+            );
+            if (!$proofPath) {
+                return response()->json(['success' => false, 'message' => 'Bukti pembayaran gagal disimpan.'], 500);
+            }
+        }
 
         $payment->update([
             'payment_method' => $request->payment_method,
-            'proof_path' => $request->payment_method === 'cash' ? null : $request->proof_path,
+            'proof_path' => $proofPath,
             'status' => 'Pending',
             'payment_date' => now()
         ]);

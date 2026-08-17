@@ -85,7 +85,7 @@ class InvoiceController extends Controller
 
         $badgeClass = $payment->status === 'Paid' ? 'badge-paid' : 'badge-unpaid';
 
-        $companyName = ($company['name'] ?? '') ?: 'SI-SAMPAH';
+        $companyName = ($company['name'] ?? '') ?: 'Fastko Recycle';
         $companyPhone = $company['phone'] ?? '';
         $companyEmail = $company['email'] ?? '';
         $companyAddress = $company['address'] ?? '';

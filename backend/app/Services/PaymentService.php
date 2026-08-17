@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Models\Setting;
+use App\Models\Company;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 
@@ -176,11 +177,13 @@ class PaymentService
      */
     public function getCompanyInfo(): array
     {
+        $company = Company::first();
+
         return [
-            'name' => (string) Setting::where('key', 'name')->value('value'),
-            'phone' => (string) Setting::where('key', 'phone')->value('value'),
-            'email' => (string) Setting::where('key', 'email')->value('value'),
-            'address' => (string) Setting::where('key', 'address')->value('value'),
+            'name' => (string) (Setting::where('key', 'name')->value('value') ?: ($company?->name ?: 'Fastko Recycle')),
+            'phone' => (string) (Setting::where('key', 'phone')->value('value') ?: ($company?->phone ?: '')),
+            'email' => (string) (Setting::where('key', 'email')->value('value') ?: ($company?->email ?: '')),
+            'address' => (string) (Setting::where('key', 'address')->value('value') ?: ($company?->address ?: '')),
         ];
     }
 }

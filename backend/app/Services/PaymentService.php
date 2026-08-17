@@ -7,6 +7,7 @@ use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Models\Setting;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 class PaymentService
 {
@@ -120,10 +121,22 @@ class PaymentService
     public function confirmPayment(Payment $payment, string $action): Payment
     {
         if ($action === 'approve') {
-            $payment->update([
+            $updates = [
                 'status' => 'Paid',
                 'paid_at' => now(),
-            ]);
+            ];
+
+            // If admin approves a payment without a valid bank/QRIS proof,
+            // classify it explicitly as an over-the-counter cash payment.
+            $hasProof = $payment->proof_path
+                && (filter_var($payment->proof_path, FILTER_VALIDATE_URL)
+                    || Storage::disk('public')->exists($payment->proof_path));
+            if (!$hasProof) {
+                $updates['payment_method'] = 'cash';
+                $updates['proof_path'] = null;
+            }
+
+            $payment->update($updates);
         } else {
             $payment->update([
                 'status' => 'Unpaid',

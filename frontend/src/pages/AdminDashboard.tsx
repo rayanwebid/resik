@@ -49,7 +49,7 @@ const typeLabel = (type: string): string => {
     const map: Record<string, string> = {
         bank_transfer: 'Transfer Bank',
         qris: 'QRIS',
-        cash: 'Tunai (Cash)',
+        cash: 'Bayar Cash',
         virtual_account: 'Virtual Account',
     };
     return map[type] || type;
@@ -1654,8 +1654,8 @@ const AdminDashboard: React.FC = () => {
                                                 <td className="px-5 py-4 font-bold text-slate-900">
                                                     Rp {Number(pay.amount).toLocaleString('id-ID')}
                                                 </td>
-                                                <td className="px-5 py-4 text-slate-500 text-xs">{pay.payment_method ?? '-'}</td>
-                                                <td className="px-5 py-4"><span className={statusBadge(pay.status)}>{pay.status}</span></td>
+                                                <td className="px-5 py-4 text-slate-500 text-xs">{pay.payment_method ? typeLabel(pay.payment_method) : '-'}</td>
+                                                <td className="px-5 py-4"><span className={statusBadge(pay.status)}>{pay.status === 'Paid' && pay.payment_method === 'cash' ? 'Bayar Cash' : pay.status}</span></td>
                                                 <td className="px-5 py-4 text-xs text-slate-400 font-mono">
                                                     {pay.proof_path ? (
                                                         <button

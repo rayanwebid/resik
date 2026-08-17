@@ -129,6 +129,7 @@ class AdminController extends Controller
 
         // Generate immediately when the new due date has entered the H-7 window.
         // The scheduled command remains as a daily fallback.
+        $this->syncUnpaidCurrentInvoiceAmount($customer);
         $this->generateCurrentBillingInvoices($paymentService);
 
         return response()->json(['success' => true, 'message' => 'Data pelanggan berhasil diperbarui.', 'data' => $customer->fresh()->load('user', 'latestMonthlyPayment')]);
@@ -140,6 +141,17 @@ class AdminController extends Controller
         $name = $customer->user?->name ?? $customer->name;
         $customer->user?->delete();
         return response()->json(['success' => true, 'message' => "Pelanggan '{$name}' berhasil dihapus."]);
+    }
+
+    private function syncUnpaidCurrentInvoiceAmount(Customer $customer): void
+    {
+        $now = now();
+        Payment::where('customer_id', $customer->id)
+            ->where('type', 'bulanan')
+            ->where('year', $now->year)
+            ->where('month', $now->month)
+            ->whereIn('status', ['Unpaid', 'Jatuh Tempo'])
+            ->update(['amount' => $customer->monthly_fee ?? 50000]);
     }
 
     private function generateCurrentBillingInvoices(PaymentService $paymentService): void
@@ -199,6 +211,7 @@ class AdminController extends Controller
         ]);
 
         $customer->update(['monthly_fee' => $data['monthly_fee']]);
+        $this->syncUnpaidCurrentInvoiceAmount($customer);
         $this->generateCurrentBillingInvoices($paymentService);
 
         return response()->json([

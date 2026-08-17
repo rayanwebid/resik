@@ -21,6 +21,11 @@ class Customer extends Model
         'house_photo',
         'customer_type',
         'payment_due_day',
+        'monthly_fee',
+    ];
+
+    protected $casts = [
+        'monthly_fee' => 'decimal:2',
     ];
 
     public function user()

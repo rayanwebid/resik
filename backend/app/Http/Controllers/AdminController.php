@@ -72,6 +72,7 @@ class AdminController extends Controller
             'phone' => 'nullable|string|max:50',
             'address' => 'nullable|string|max:1000',
             'payment_due_day' => 'nullable|integer|min:1|max:31',
+            'monthly_fee' => 'nullable|numeric|min:0|max:999999999999.99',
         ]);
 
         $customer = DB::transaction(function () use ($data) {
@@ -89,6 +90,7 @@ class AdminController extends Controller
                 'address' => $data['address'] ?? '',
                 'customer_type' => 'rumah_tangga',
                 'payment_due_day' => $data['payment_due_day'] ?? null,
+                'monthly_fee' => $data['monthly_fee'] ?? 50000,
             ]);
         });
 
@@ -107,6 +109,7 @@ class AdminController extends Controller
             'phone' => 'nullable|string|max:50',
             'address' => 'nullable|string|max:1000',
             'payment_due_day' => 'nullable|integer|min:1|max:31',
+            'monthly_fee' => 'nullable|numeric|min:0|max:999999999999.99',
             'status' => 'nullable|in:active,pending,rejected,inactive',
         ]);
 
@@ -120,6 +123,7 @@ class AdminController extends Controller
                 'phone' => $data['phone'] ?? '',
                 'address' => $data['address'] ?? '',
                 'payment_due_day' => $data['payment_due_day'] ?? null,
+                'monthly_fee' => $data['monthly_fee'] ?? $customer->monthly_fee,
             ]);
         });
 
@@ -184,6 +188,23 @@ class AdminController extends Controller
             'success' => true,
             'message' => 'Tanggal jatuh tempo pembayaran bulanan berhasil diperbarui.',
             'data' => $customer->fresh()
+        ]);
+    }
+
+    /** Update the customer's monthly subscription fee. */
+    public function updateMonthlyFee(Request $request, Customer $customer, PaymentService $paymentService): JsonResponse
+    {
+        $data = $request->validate([
+            'monthly_fee' => 'required|numeric|min:0|max:999999999999.99',
+        ]);
+
+        $customer->update(['monthly_fee' => $data['monthly_fee']]);
+        $this->generateCurrentBillingInvoices($paymentService);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Jumlah iuran bulanan pelanggan berhasil diperbarui.',
+            'data' => $customer->fresh()->load('latestMonthlyPayment'),
         ]);
     }
 

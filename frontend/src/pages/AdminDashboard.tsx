@@ -170,6 +170,7 @@ const AdminDashboard: React.FC = () => {
     // Payment due day editing
     const [updatingDueDayId, setUpdatingDueDayId] = useState<number | null>(null);
     const [dueDayCache, setDueDayCache] = useState<Record<number, number | undefined>>({});
+    const [monthlyFeeCache, setMonthlyFeeCache] = useState<Record<number, number | undefined>>({});
 
     // Customer CRUD (inline form, no popup)
     const [customerFormOpen, setCustomerFormOpen] = useState(false);
@@ -177,7 +178,7 @@ const AdminDashboard: React.FC = () => {
     const [customerFormLoading, setCustomerFormLoading] = useState(false);
     const [customerFormError, setCustomerFormError] = useState<string | null>(null);
     const [customerForm, setCustomerForm] = useState({
-        name: '', email: '', password: '', phone: '', address: '', payment_due_day: '', status: 'active'
+        name: '', email: '', password: '', phone: '', address: '', payment_due_day: '', monthly_fee: '50000', status: 'active'
     });
 
     // New Officer form state
@@ -441,8 +442,21 @@ const AdminDashboard: React.FC = () => {
         }
     };
 
+    const handleUpdateMonthlyFee = async (customerId: number, monthlyFee: number) => {
+        setUpdatingDueDayId(customerId);
+        try {
+            const res = await api.put(`/admin/customers/${customerId}/monthly-fee`, { monthly_fee: monthlyFee });
+            if (res.data.success) fetchData(false);
+        } catch (err: any) {
+            console.error(err);
+            alert(err.response?.data?.message || 'Gagal mengatur jumlah iuran.');
+        } finally {
+            setUpdatingDueDayId(null);
+        }
+    };
+
     const resetCustomerForm = () => {
-        setCustomerForm({ name: '', email: '', password: '', phone: '', address: '', payment_due_day: '', status: 'active' });
+        setCustomerForm({ name: '', email: '', password: '', phone: '', address: '', payment_due_day: '', monthly_fee: '50000', status: 'active' });
         setEditingCustomerId(null);
         setCustomerFormError(null);
     };
@@ -454,6 +468,7 @@ const AdminDashboard: React.FC = () => {
             email: customer.user?.email ?? customer.email ?? '',
             password: '', phone: customer.phone ?? '', address: customer.address ?? '',
             payment_due_day: customer.payment_due_day?.toString() ?? '',
+            monthly_fee: customer.monthly_fee?.toString() ?? '50000',
             status: customer.user?.status ?? customer.status ?? 'active',
         });
         setCustomerFormError(null);
@@ -469,6 +484,7 @@ const AdminDashboard: React.FC = () => {
             const payload: any = { ...customerForm };
             if (payload.payment_due_day) payload.payment_due_day = parseInt(payload.payment_due_day, 10);
             else delete payload.payment_due_day;
+            payload.monthly_fee = Number(payload.monthly_fee || 0);
             if (editingCustomerId && !payload.password) delete payload.password;
             const res = editingCustomerId
                 ? await api.put(`/admin/customers/${editingCustomerId}`, payload)
@@ -998,6 +1014,7 @@ const AdminDashboard: React.FC = () => {
                                         <input required={!editingCustomerId} type="password" placeholder={editingCustomerId ? 'Password baru (opsional)' : 'Password minimal 6 karakter'} value={customerForm.password} onChange={e => setCustomerForm({ ...customerForm, password: e.target.value })} className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
                                         <input placeholder="Nomor HP" value={customerForm.phone} onChange={e => setCustomerForm({ ...customerForm, phone: e.target.value })} className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
                                         <input type="number" min="1" max="31" placeholder="Tanggal jatuh tempo (1-31)" value={customerForm.payment_due_day} onChange={e => setCustomerForm({ ...customerForm, payment_due_day: e.target.value })} className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
+                                        <input type="number" min="0" step="1000" placeholder="Jumlah iuran bulanan" value={customerForm.monthly_fee} onChange={e => setCustomerForm({ ...customerForm, monthly_fee: e.target.value })} className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
                                         {editingCustomerId && <select value={customerForm.status} onChange={e => setCustomerForm({ ...customerForm, status: e.target.value })} className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm"><option value="active">Aktif</option><option value="pending">Pending</option><option value="inactive">Nonaktif</option><option value="rejected">Ditolak</option></select>}
                                         <textarea placeholder="Alamat lengkap" value={customerForm.address} onChange={e => setCustomerForm({ ...customerForm, address: e.target.value })} className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm md:col-span-2 lg:col-span-3" rows={2} />
                                     </div>
@@ -1013,7 +1030,7 @@ const AdminDashboard: React.FC = () => {
                                     <table className="w-full min-w-[800px] divide-y divide-slate-100">
                                     <thead className="bg-slate-50">
                                          <tr>
-                                            {['Pelanggan', 'NIK', 'Alamat', 'Tgl Jatuh Tempo', 'Tanggal Tagihan', 'Status', 'Aksi'].map(h => (
+                                            {['Pelanggan', 'NIK', 'Alamat', 'Iuran Bulanan', 'Tgl Jatuh Tempo', 'Tanggal Tagihan', 'Status', 'Aksi'].map(h => (
                                                 <th key={h} className="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">{h}</th>
                                             ))}
                                         </tr>
@@ -1041,6 +1058,24 @@ const AdminDashboard: React.FC = () => {
                                                     </td>
                                                     <td className="px-6 py-4 text-slate-600 font-mono text-xs">{cust.nik ?? '-'}</td>
                                                     <td className="px-6 py-4 text-slate-500 max-w-xs truncate">{cust.address ?? '-'}</td>
+                                                    <td className="px-6 py-4">
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            step="1000"
+                                                            value={monthlyFeeCache[c.id] ?? Number(c.monthly_fee ?? 50000)}
+                                                            onChange={(e) => setMonthlyFeeCache({ ...monthlyFeeCache, [c.id]: Number(e.target.value) })}
+                                                            onBlur={() => {
+                                                                const val = monthlyFeeCache[c.id] ?? Number(c.monthly_fee ?? 50000);
+                                                                if (val !== Number(c.monthly_fee ?? 50000)) handleUpdateMonthlyFee(c.id, val);
+                                                                else setMonthlyFeeCache(prev => { const next = { ...prev }; delete next[c.id]; return next; });
+                                                            }}
+                                                            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                                                            disabled={updatingDueDayId === c.id}
+                                                            className="w-28 px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-emerald-500 disabled:opacity-50"
+                                                        />
+                                                        <p className="text-[10px] text-slate-400 mt-1">Rp {Number(c.monthly_fee ?? 50000).toLocaleString('id-ID')}</p>
+                                                    </td>
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center gap-1.5">
                                                             <input

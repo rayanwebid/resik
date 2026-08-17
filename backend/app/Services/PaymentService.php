@@ -52,6 +52,9 @@ class PaymentService
         })->get();
 
         foreach ($customers as $customer) {
+            $customerFee = $customer->monthly_fee !== null
+                ? (float) $customer->monthly_fee
+                : $fee;
             // Use customer's custom due day if set, otherwise default to last day of month
             if ($customer->payment_due_day) {
                 $customerDueDate = Carbon::create($year, $month, min($customer->payment_due_day, $dueDate->daysInMonth))->startOfDay();
@@ -80,7 +83,7 @@ class PaymentService
                 'customer_id' => $customer->id,
                 'invoice_number' => $this->generateInvoiceNumber($customer->id, $year, $month),
                 'type' => 'bulanan',
-                'amount' => $fee,
+                'amount' => $customerFee,
                 'month' => $month,
                 'year' => $year,
                 'status' => 'Unpaid',

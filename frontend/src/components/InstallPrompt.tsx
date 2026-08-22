@@ -6,7 +6,7 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 };
 
-const DISMISSED_KEY = 'fastko-pwa-install-dismissed';
+const DISMISSED_KEY = 'fastko-pwa-install-dismissed-v2';
 
 function isStandalone(): boolean {
   return window.matchMedia('(display-mode: standalone)').matches
@@ -110,7 +110,7 @@ export default function InstallPrompt() {
             className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-600/20"
           >
             <Download className="h-4 w-4" />
-            Install PWA Fastko Recycle
+            Install Aplikasi Fastko Recycle
           </button>
         )}
 

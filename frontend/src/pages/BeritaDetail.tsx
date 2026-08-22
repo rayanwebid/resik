@@ -80,11 +80,11 @@ const BeritaDetail: React.FC = () => {
                 </div>
 
                 {news.image && (
-                    <div className="rounded-2xl overflow-hidden border border-slate-100 max-h-[50vh] bg-slate-50 flex items-center justify-center">
+                    <div className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 flex items-center justify-center">
                         <img
                             src={news.image}
                             alt={news.title}
-                            className="w-full h-full object-cover"
+                            className="block w-full h-auto max-h-none object-contain"
                             onError={(e) => {
                                 (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1595275372274-1216652e008d?auto=format&fit=crop&w=800&q=80';
                             }}

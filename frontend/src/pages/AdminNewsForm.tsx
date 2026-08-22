@@ -58,9 +58,13 @@ const AdminNewsForm: React.FC = () => {
             }
 
             if (isEdit) {
-                await api.post(`/admin/news/${id}`, formData);
+                await api.post(`/admin/news/${id}`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                });
             } else {
-                await api.post('/admin/news', formData);
+                await api.post('/admin/news', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                });
             }
 
             alert(isEdit ? 'Berita berhasil diperbarui!' : 'Berita berhasil dibuat!');

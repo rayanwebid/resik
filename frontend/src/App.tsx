@@ -14,6 +14,7 @@ import CustomerDashboard from './pages/CustomerDashboard';
 import OfficerDashboard from './pages/OfficerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminNewsForm from './pages/AdminNewsForm';
+import InstallPrompt from './components/InstallPrompt';
 
 // Route Guard for Authenticated Users
 const PrivateRoute: React.FC<{ children: React.ReactNode; allowedRole?: string }> = ({
@@ -120,6 +121,7 @@ function App() {
       <AuthProvider>
         <CompanyProvider>
           <AppRoutes />
+          <InstallPrompt />
         </CompanyProvider>
       </AuthProvider>
     </BrowserRouter>

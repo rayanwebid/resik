@@ -16,22 +16,26 @@ export default defineConfig({
         enabled: true
       },
       manifest: {
-        name: 'ResikApp - Layanan Sampah',
-        short_name: 'ResikApp',
-        description: 'Sistem Informasi Manajemen Sampah',
+        name: 'Fastko Recycle',
+        short_name: 'Fastko',
+        description: 'Layanan pengelolaan sampah Fastko Recycle',
         theme_color: '#10b981',
         background_color: '#ffffff',
         display: 'standalone',
+        start_url: '/',
+        scope: '/',
         icons: [
           {
-            src: '/icon-192x192.svg',
+            src: '/fastko-icon-192-v2.png',
             sizes: '192x192',
-            type: 'image/svg+xml'
+            type: 'image/png',
+            purpose: 'any maskable'
           },
           {
-            src: '/icon-512x512.svg',
+            src: '/fastko-icon-512-v2.png',
             sizes: '512x512',
-            type: 'image/svg+xml'
+            type: 'image/png',
+            purpose: 'any maskable'
           }
         ]
       }

@@ -27,6 +27,10 @@ const Navbar: React.FC = () => {
         return location.pathname === path;
     };
 
+    const handleMobileNavigation = () => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    };
+
     return (
         <>
             <nav className="bg-white border-b border-gray-100 sticky top-0 z-50">
@@ -89,6 +93,7 @@ const Navbar: React.FC = () => {
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-gray-100 flex items-center justify-around h-16 shadow-2xl pb-safe">
                 <Link
                     to="/"
+                    onClick={handleMobileNavigation}
                     className={`flex flex-col items-center justify-center flex-1 py-1 transition-all ${isActive('/') ? 'text-emerald-600 scale-105' : 'text-gray-400 hover:text-emerald-500'}`}
                 >
                     <Home className="h-5 w-5" />
@@ -96,6 +101,7 @@ const Navbar: React.FC = () => {
                 </Link>
                 <Link
                     to="/layanan"
+                    onClick={handleMobileNavigation}
                     className={`flex flex-col items-center justify-center flex-1 py-1 transition-all ${isActive('/layanan') ? 'text-emerald-600 scale-105' : 'text-gray-400 hover:text-emerald-500'}`}
                 >
                     <Truck className="h-5 w-5" />
@@ -103,6 +109,7 @@ const Navbar: React.FC = () => {
                 </Link>
                 <Link
                     to="/berita"
+                    onClick={handleMobileNavigation}
                     className={`flex flex-col items-center justify-center flex-1 py-1 transition-all ${isActive('/berita') || location.pathname.startsWith('/berita/') ? 'text-emerald-600 scale-105' : 'text-gray-400 hover:text-emerald-500'}`}
                 >
                     <Newspaper className="h-5 w-5" />
@@ -110,6 +117,7 @@ const Navbar: React.FC = () => {
                 </Link>
                 <Link
                     to="/faq"
+                    onClick={handleMobileNavigation}
                     className={`flex flex-col items-center justify-center flex-1 py-1 transition-all ${isActive('/faq') ? 'text-emerald-600 scale-105' : 'text-gray-400 hover:text-emerald-500'}`}
                 >
                     <HelpCircle className="h-5 w-5" />
@@ -118,6 +126,7 @@ const Navbar: React.FC = () => {
                 {isAuthenticated ? (
                     <Link
                         to={getDashboardPath()}
+                        onClick={handleMobileNavigation}
                         className="flex flex-col items-center justify-center flex-1 py-1 text-gray-400 hover:text-emerald-500 transition-all"
                     >
                         <LayoutDashboard className="h-5 w-5" />
@@ -126,6 +135,7 @@ const Navbar: React.FC = () => {
                 ) : (
                     <Link
                         to="/login"
+                        onClick={handleMobileNavigation}
                         className={`flex flex-col items-center justify-center flex-1 py-1 transition-all ${isActive('/login') ? 'text-emerald-600 scale-105' : 'text-gray-400 hover:text-emerald-500'}`}
                     >
                         <User className="h-5 w-5" />

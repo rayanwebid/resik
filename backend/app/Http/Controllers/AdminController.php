@@ -287,6 +287,68 @@ class AdminController extends Controller
         ], 201);
     }
 
+    /** Update officer profile and login email. Password is optional here. */
+    public function updateOfficer(Request $request, Officer $officer): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255|unique:users,email,' . $officer->user_id,
+            'nik' => 'required|string|max:50|unique:officers,nik,' . $officer->id,
+            'phone' => 'required|string|max:50',
+            'address' => 'required|string|max:1000',
+            'region' => 'nullable|string|max:255',
+            'is_active' => 'nullable|boolean',
+        ]);
+
+        DB::transaction(function () use ($data, $officer) {
+            $officer->user()->update([
+                'name' => $data['name'],
+                'email' => $data['email'],
+            ]);
+            $officer->update([
+                'name' => $data['name'],
+                'nik' => $data['nik'],
+                'phone' => $data['phone'],
+                'address' => $data['address'],
+                'region' => $data['region'] ?? null,
+                'is_active' => $data['is_active'] ?? $officer->is_active,
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data petugas berhasil diperbarui.',
+            'data' => $officer->fresh()->load('user'),
+        ]);
+    }
+
+    /** Reset an officer password directly by an authorized admin. */
+    public function resetOfficerPassword(Request $request, Officer $officer): JsonResponse
+    {
+        $data = $request->validate([
+            'password' => 'required|string|min:6|max:255',
+        ]);
+
+        $officer->user()->update(['password' => Hash::make($data['password'])]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password petugas berhasil diatur ulang.',
+        ]);
+    }
+
+    /** Delete the officer account and its officer profile. */
+    public function destroyOfficer(Officer $officer): JsonResponse
+    {
+        $name = $officer->name;
+        $officer->user()->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Petugas '{$name}' berhasil dihapus.",
+        ]);
+    }
+
     /**
      * Toggle officer active status
      */

@@ -75,6 +75,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/customers/{customer}/monthly-fee', [AdminController::class, 'updateMonthlyFee']);
         Route::get('/officers', [AdminController::class, 'officers']);
         Route::post('/officers', [AdminController::class, 'storeOfficer']);
+        Route::put('/officers/{officer}', [AdminController::class, 'updateOfficer']);
+        Route::post('/officers/{officer}/reset-password', [AdminController::class, 'resetOfficerPassword']);
+        Route::delete('/officers/{officer}', [AdminController::class, 'destroyOfficer']);
         Route::post('/officers/{officer}/toggle', [AdminController::class, 'toggleOfficer']);
         Route::post('/pickup-requests', [AdminController::class, 'createPickup']);
         Route::post('/pickup-requests/{pickupRequest}/assign', [AdminController::class, 'assignPickup']);

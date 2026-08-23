@@ -181,7 +181,8 @@ const AdminDashboard: React.FC = () => {
         name: '', email: '', password: '', phone: '', address: '', payment_due_day: '', monthly_fee: '50000', status: 'active'
     });
 
-    // New Officer form state
+    // Officer CRUD form state
+    const [editingOfficerId, setEditingOfficerId] = useState<number | null>(null);
     const [officerForm, setOfficerForm] = useState({
         name: '', email: '', password: 'petugas123',
         nik: '', phone: '', address: '', region: 'Coblong',
@@ -525,17 +526,63 @@ const AdminDashboard: React.FC = () => {
         setOfficerError(null);
         setOfficerSuccess(false);
         try {
-            const res = await api.post('/admin/officers', officerForm);
+            const payload: any = { ...officerForm };
+            if (editingOfficerId) delete payload.password;
+            const res = editingOfficerId
+                ? await api.put(`/admin/officers/${editingOfficerId}`, payload)
+                : await api.post('/admin/officers', payload);
             if (res.data.success) {
                 setOfficerSuccess(true);
+                setEditingOfficerId(null);
                 setOfficerForm({ name: '', email: '', password: 'petugas123', nik: '', phone: '', address: '', region: 'Coblong' });
                 fetchData(false);
                 setTimeout(() => setOfficerSuccess(false), 4000);
             }
         } catch (err: any) {
-            setOfficerError(err.response?.data?.message || 'Gagal mendaftarkan petugas baru.');
+            setOfficerError(err.response?.data?.message || Object.values(err.response?.data?.errors ?? {}).flat().join(' ') || 'Gagal menyimpan data petugas.');
         } finally {
             setOfficerLoading(false);
+        }
+    };
+
+    const handleEditOfficer = (officer: any) => {
+        setEditingOfficerId(officer.id);
+        setOfficerError(null);
+        setOfficerSuccess(false);
+        setOfficerForm({
+            name: officer.name ?? officer.user?.name ?? '',
+            email: officer.user?.email ?? '',
+            password: '',
+            nik: officer.nik ?? '',
+            phone: officer.phone ?? '',
+            address: officer.address ?? '',
+            region: officer.region ?? '',
+        });
+    };
+
+    const handleResetOfficerPassword = async (officer: any) => {
+        const password = window.prompt(`Password baru untuk ${officer.name ?? officer.user?.name}:`);
+        if (password === null) return;
+        if (password.length < 6) {
+            alert('Password minimal 6 karakter.');
+            return;
+        }
+        try {
+            const res = await api.post(`/admin/officers/${officer.id}/reset-password`, { password });
+            if (res.data.success) alert('Password petugas berhasil diatur ulang.');
+        } catch (err: any) {
+            alert(err.response?.data?.message || 'Gagal mengatur ulang password petugas.');
+        }
+    };
+
+    const handleDeleteOfficer = async (officer: any) => {
+        const name = officer.name ?? officer.user?.name ?? 'petugas ini';
+        if (!window.confirm(`Hapus petugas ${name}? Riwayat penugasan tetap dipertahankan.`)) return;
+        try {
+            const res = await api.delete(`/admin/officers/${officer.id}`);
+            if (res.data.success) fetchData(false);
+        } catch (err: any) {
+            alert(err.response?.data?.message || 'Gagal menghapus petugas.');
         }
     };
 
@@ -1278,15 +1325,35 @@ const AdminDashboard: React.FC = () => {
                                                         </span>
                                                     </td>
                                                     <td className="px-5 py-3.5">
-                                                        <button
-                                                            onClick={() => handleToggleOfficer(o.id)}
-                                                            className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${o.is_active
-                                                                ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200'
-                                                                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
-                                                                }`}
-                                                        >
-                                                            {o.is_active ? 'Nonaktifkan' : 'Aktifkan'}
-                                                        </button>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <button
+                                                                onClick={() => handleEditOfficer(o)}
+                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200"
+                                                            >
+                                                                <Edit className="h-3.5 w-3.5" /> Edit
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleResetOfficerPassword(o)}
+                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200"
+                                                            >
+                                                                Reset Password
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleToggleOfficer(o.id)}
+                                                                className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${o.is_active
+                                                                    ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200'
+                                                                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                                                    }`}
+                                                            >
+                                                                {o.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteOfficer(o)}
+                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200"
+                                                            >
+                                                                <Trash2 className="h-3.5 w-3.5" /> Hapus
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             )) : (
@@ -1305,8 +1372,8 @@ const AdminDashboard: React.FC = () => {
                                 <div className="lg:col-span-2">
                                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
                                         <div>
-                                            <h3 className="font-bold text-slate-900">Daftarkan Petugas Baru</h3>
-                                            <p className="text-xs text-slate-400 mt-0.5">Isi data lengkap petugas lapangan baru</p>
+                                            <h3 className="font-bold text-slate-900">{editingOfficerId ? 'Edit Data Petugas' : 'Daftarkan Petugas Baru'}</h3>
+                                            <p className="text-xs text-slate-400 mt-0.5">{editingOfficerId ? 'Perbarui data petugas lapangan' : 'Isi data lengkap petugas lapangan baru'}</p>
                                         </div>
 
                                         {officerSuccess && (
@@ -1326,10 +1393,10 @@ const AdminDashboard: React.FC = () => {
                                             {[
                                                 { label: 'Nama Lengkap', key: 'name', type: 'text', placeholder: 'Budi Santoso' },
                                                 { label: 'Email Login', key: 'email', type: 'email', placeholder: 'budi@resikapp.com' },
-                                                { label: 'Password Awal', key: 'password', type: 'text', placeholder: 'petugas123' },
+                                                { label: 'Password Awal', key: 'password', type: 'password', placeholder: 'Minimal 6 karakter' },
                                                 { label: 'NIK (16 digit)', key: 'nik', type: 'text', placeholder: '32XXXXXXXXXXXXXX' },
                                                 { label: 'No. Handphone', key: 'phone', type: 'text', placeholder: '081234567890' },
-                                            ].map(field => (
+                                            ].filter(field => !editingOfficerId || field.key !== 'password').map(field => (
                                                 <div key={field.key}>
                                                     <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">{field.label}</label>
                                                     <input
@@ -1371,8 +1438,17 @@ const AdminDashboard: React.FC = () => {
                                                 disabled={officerLoading}
                                                 className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white rounded-xl font-semibold text-sm transition-colors"
                                             >
-                                                {officerLoading ? 'Mendaftarkan...' : 'Daftarkan Petugas'}
+                                                {officerLoading ? 'Menyimpan...' : (editingOfficerId ? 'Simpan Perubahan' : 'Daftarkan Petugas')}
                                             </button>
+                                            {editingOfficerId && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setEditingOfficerId(null); setOfficerError(null); setOfficerForm({ name: '', email: '', password: 'petugas123', nik: '', phone: '', address: '', region: 'Coblong' }); }}
+                                                    className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-sm transition-colors"
+                                                >
+                                                    Batal Edit
+                                                </button>
+                                            )}
                                         </form>
                                     </div>
                                 </div>

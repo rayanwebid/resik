@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
-    LayoutDashboard, Truck, History, CreditCard, Navigation, LogOut,
+    LayoutDashboard, Truck, History, CreditCard, Navigation, LogOut, Home,
     Clock, DollarSign, AlertCircle, CheckCircle2, Upload, Eye, FileText, MapPin,
     Printer
 } from 'lucide-react';
@@ -246,6 +246,13 @@ const CustomerDashboard: React.FC = () => {
                 <div className="flex items-center space-x-3">
                     <span className="text-xs font-bold text-slate-300">{user?.name}</span>
                     <button
+                        onClick={() => navigate('/')}
+                        className="p-1 text-slate-300 hover:text-white rounded bg-slate-800 transition-colors"
+                        title="Lihat Halaman Depan"
+                    >
+                        <Home className="h-4 w-4" />
+                    </button>
+                    <button
                         onClick={() => { logout(); navigate('/'); }}
                         className="p-1 text-slate-400 hover:text-red-500 rounded bg-slate-800 transition-colors"
                         title="Keluar"
@@ -315,6 +322,13 @@ const CustomerDashboard: React.FC = () => {
                         </div>
                     </div>
 
+                    <button
+                        onClick={() => navigate('/')}
+                        className="w-full flex items-center space-x-3 px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-emerald-400 transition-colors mb-1"
+                    >
+                        <Home className="h-4.5 w-4.5" />
+                        <span>Lihat Halaman Depan</span>
+                    </button>
                     <button
                         onClick={() => { logout(); navigate('/'); }}
                         className="w-full flex items-center space-x-3 px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-850 hover:text-red-500 transition-colors"

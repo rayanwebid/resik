@@ -6,7 +6,7 @@ import {
     Clock, UserPlus, ArrowRightLeft, Truck,
     CheckCircle2, XCircle, AlertCircle, RefreshCw,
     ChevronDown, Search, Shield, TrendingUp, Banknote, Eye,
-    FileText, Globe, Plus, Trash2, Edit, MapPin, Printer
+    FileText, Globe, Plus, Trash2, Edit, MapPin, Printer, Home
 } from 'lucide-react';
 import api, { getApiBaseUrl } from '../services/api';
 import { useCompany } from '../contexts/CompanyContext';
@@ -842,6 +842,14 @@ const AdminDashboard: React.FC = () => {
                         <p className="text-[10px] md:text-xs text-slate-400 mt-1 truncate max-w-[200px] sm:max-w-xs">{company.name} — Sistem Informasi Manajemen Sampah</p>
                     </div>
                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => navigate('/')}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-emerald-700 hover:text-emerald-800 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-all"
+                            title="Lihat Halaman Depan"
+                        >
+                            <Home className="h-3 w-3" />
+                            <span className="hidden sm:inline">Halaman Depan</span>
+                        </button>
                         <button
                             onClick={() => fetchData(true)}
                             className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-all ${refreshing ? 'opacity-60 cursor-not-allowed' : ''}`}
